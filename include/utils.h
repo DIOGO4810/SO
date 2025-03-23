@@ -1,6 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-void mySystem(void);  
+char* concatInput(int argc, char** input);
 
 #endif 
