@@ -1,6 +1,16 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-void lineParser();  
+typedef struct parser Parser;
+
+Parser *newParser();
+
+Parser *parser(Parser *parserE,char* line);
+
+void freeParser(Parser *parserE);
+
+char** getTokens(Parser * parserE);
+
+
 
 #endif 
