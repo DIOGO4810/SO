@@ -18,13 +18,14 @@ char *removeAspas(char *str)
 
 char *concatInput(int argc, char **input)
 {
-    char **inputSemAspas = malloc((argc - 2) * sizeof(char *));
+    char **inputSemAspas = malloc((argc - 1) * sizeof(char *));
     char *ret = malloc(256 * sizeof(char));
-    for (int i = 2; i < argc; i++)
+    for (int i = 1; i < argc; i++)
     {
-        inputSemAspas[i - 2] = removeAspas(input[i]);
+        inputSemAspas[i - 1] = removeAspas(input[i]);
     }
 
-    sprintf(ret, "%s %s %s %s", inputSemAspas[0], inputSemAspas[1], inputSemAspas[2], inputSemAspas[3]);
+    sprintf(ret, "%s %s %s %s %s", inputSemAspas[0], inputSemAspas[1], inputSemAspas[2], inputSemAspas[3],inputSemAspas[4]);
+    free(inputSemAspas);
     return ret;
 }

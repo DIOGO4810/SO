@@ -1,8 +1,6 @@
-
 CC = gcc
-CFLAGS = -Wall -g -Iinclude
-LDFLAGS =
-
+CFLAGS := -Wall -g -Og -O2 -Wextra -pedantic -Iinclude $(shell pkg-config --cflags glib-2.0) 
+LDFLAGS := $(shell pkg-config --libs glib-2.0) -L/usr/lib/x86_64-linux-gnu -lm
 
 SRC_UTILS := $(shell find src/utils/ -name "*.c")
 
@@ -11,7 +9,6 @@ SRC_DCLIENT := src/dclient.c $(SRC_UTILS)
 
 OBJ_DSERVER := $(SRC_DSERVER:src/%.c=obj/%.o)
 OBJ_DCLIENT := $(SRC_DCLIENT:src/%.c=obj/%.o)
-
 
 all: folders dserver dclient
 
@@ -22,22 +19,18 @@ folders:
 	@mkdir -p src include obj bin tmp
 	@mkdir -p obj/utils
 
+# Compilação do dclient
+bin/dclient: $(OBJ_DCLIENT)
+	@$(CC) $(OBJ_DCLIENT) $(LDFLAGS) -o $@
 
 # Compilação do dserver
 bin/dserver: $(OBJ_DSERVER)
-	@$(CC) $(LDFLAGS) $(CFLAGS) $^ -o $@
-
-
-# Compilação do dclient
-bin/dclient: $(OBJ_DCLIENT)
-	@$(CC) $(LDFLAGS) $(CFLAGS) $^ -o $@
-
+	@$(CC) $(OBJ_DSERVER) $(LDFLAGS) -o $@
 
 # Compilação dos arquivos .c para .o
 obj/%.o: src/%.c
 	@mkdir -p $(dir $@)  
 	@$(CC) $(CFLAGS) -c $< -o $@
-
 
 clean:
 	rm -rf obj/* tmp/* bin/*
