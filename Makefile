@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS := -Wall -g -Og -O2 -Wextra -pedantic -Iinclude $(shell pkg-config --cflags glib-2.0) 
+CFLAGS := -Wall -Wno-unused-result -g -Og -O2 -Wextra -pedantic -Iinclude $(shell pkg-config --cflags glib-2.0) 
 LDFLAGS := $(shell pkg-config --libs glib-2.0) -L/usr/lib/x86_64-linux-gnu -lm
 
 SRC_UTILS := $(shell find src/utils/ -name "*.c")

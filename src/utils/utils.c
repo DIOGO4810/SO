@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 char *removeAspas(char *str)
 {
@@ -16,16 +17,24 @@ char *removeAspas(char *str)
     return str;
 }
 
-char *concatInput(int argc, char **input)
+char *concatInput(int argc, char **input, const char *format, ...)
 {
+    
     char **inputSemAspas = malloc((argc - 1) * sizeof(char *));
-    char *ret = malloc(256 * sizeof(char));
     for (int i = 1; i < argc; i++)
     {
         inputSemAspas[i - 1] = removeAspas(input[i]);
     }
 
-    sprintf(ret, "%s %s %s %s %s", inputSemAspas[0], inputSemAspas[1], inputSemAspas[2], inputSemAspas[3],inputSemAspas[4]);
+    char *ret = malloc(256 * sizeof(char));
+
+    // Prepara os argumentos para passar ao vsprintf
+    va_list parametros;
+    //Inicializa os parametros com o ultimo argumento finito
+    va_start(parametros, format);
+    vsprintf(ret, format, parametros);  // Formata a string de acordo com o formato fornecido
+    va_end(parametros);
+
     free(inputSemAspas);
     return ret;
 }
