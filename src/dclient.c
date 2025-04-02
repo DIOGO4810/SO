@@ -11,42 +11,58 @@
 #define fifoDirectory "tmp/writeClientFIFO"
 
 
-void getServerMessage(char** argv,int fd){
-    while (1)
-    {
-        fd = open("tmp/writeServerFIFO",O_RDONLY);
-        if (fd == -1)continue;
+void getServerMessage(char** argv, int fd) {
+    while (1) {
+        fd = open("tmp/writeServerFIFO", O_RDONLY);
+        if (fd == -1) continue;
 
+        char command = argv[1][1]; 
 
-        if(argv[1][1] == 'a'){
+        switch (command) {
+            case 'a': {
+                char serverOutput[256] = "";
+                (void)read(fd, serverOutput, 256);
+                printf("%s\n", serverOutput);
+                break;
+            }
 
-            char serverOutput[256] = "";
-            (void)read(fd,serverOutput,256);
-            printf("%s\n",serverOutput);
-        }
+            case 'c': {
+                char serverOutput[512] = "";
+                (void)read(fd, serverOutput, 512);
 
-        if(argv[1][1] == 'c'){
+                Parser *parseFIFO = newParser();
+                parseFIFO = parser(parseFIFO, serverOutput);
+                char **tokens = getTokens(parseFIFO);
 
-            char serverOutput[512] = "";
-            (void)read(fd,serverOutput,512);
+                if (atoi(tokens[0]) == 404) {
+                    printf("Index não existente\n");
+                    freeParser(parseFIFO);
+                    break;
+                }
 
-            Parser *parseFIFO = newParser();
-            parseFIFO = parser(parseFIFO, serverOutput);
-            char **tokens = getTokens(parseFIFO);
-            if (atoi(tokens[0]) == 404){
-                printf("Index não existente\n");
+                printf("Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",
+                       tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
+
                 freeParser(parseFIFO);
                 break;
             }
-            
-            printf("Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",tokens[0],tokens[1],atoi(tokens[2]),tokens[3]);
-            freeParser(parseFIFO);
-        }
 
+            case 'd':{
+                char serverOutput[256] = "";
+                (void)read(fd, serverOutput, 256);
+                printf("%s\n", serverOutput);
+                break;
+            }
+
+            default:
+                printf("Comando inválido\n");
+                break;
+        }
 
         break;
     }
 }
+
 
 
 int main(int argc, char *argv[])
@@ -71,6 +87,15 @@ int main(int argc, char *argv[])
         free(indiceConsulta);
         close(fd);
         
+        break;
+
+    case 'd':
+        fd = open("tmp/writeClientFIFO",O_WRONLY);
+        char *indiceRemove = concatInput(argc, argv, "%s %d ", argv[1], atoi(argv[2]));
+        (void) write(fd,indiceRemove,strlen(indiceRemove));
+        free(indiceRemove);
+        close(fd);
+
         break;
     case 'f':
         fd = open("tmp/writeClientFIFO",O_WRONLY);
