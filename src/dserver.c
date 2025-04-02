@@ -37,6 +37,7 @@ void freeEstrutura(GArray *estrutura)
 {
     for (guint i = 0; i < estrutura->len; i++)
     {
+        if(g_array_index(estrutura, Index *, i) == NULL)continue;
         Index *item = g_array_index(estrutura, Index *, i);
         freeIndex(item);
     }
@@ -51,12 +52,15 @@ void printIndice(Index *indice)
 
 void printGArrayIndex(GArray *array)
 {
-    printf("GArray contém %u elementos:\n", array->len);
+    int numeroValidos = 0;
     for (guint i = 0; i < array->len; i++)
     {
+        if(g_array_index(array, Index *, i) == NULL)continue;
+        numeroValidos++;
         Index *item = g_array_index(array, Index *, i);
         printIndice(item);
     }
+    printf("GArray contém %d elementos\n",numeroValidos);
 }
 
 void respondMessageAdiciona(char *diretoria, guint arraySize)
@@ -92,6 +96,17 @@ void respondErrorMessage(char *diretoria)
     free(message);
 }
 
+void respondMessageRemove(char* diretoria , int indice){
+    mkfifo(diretoria, 0666);
+    pid_t fdmessage = open(diretoria, O_WRONLY);
+    char *message = malloc(256 * sizeof(char));
+    sprintf(message, "Index entry %d deleted",indice);
+    (void) write(fdmessage, message, strlen(message));
+    close(fdmessage);
+    free(message);
+
+}
+
 
 
 void handleInput(char **tokens,GArray* indexArray)
@@ -110,14 +125,29 @@ void handleInput(char **tokens,GArray* indexArray)
 
     case 'c':{
         int indiceArray = atoi(tokens[1]);
-        if(indiceArray < 0 || indiceArray > (int)indexArray->len){
+        if(indexArray->len == 0 || indiceArray < 0 || indiceArray > (int)indexArray->len ){
+            respondErrorMessage("tmp/writeServerFIFO");
+            break;
+        }
+        if( g_array_index(indexArray,Index*, indiceArray) == NULL){
             respondErrorMessage("tmp/writeServerFIFO");
             break;
         }
         Index* indice = g_array_index(indexArray,Index*, indiceArray);
         respondMessageConsulta("tmp/writeServerFIFO",indice);
-
     }
+    break;
+
+    case 'd':{
+        int indiceArray = atoi(tokens[1]);
+        if(indiceArray < 0 || indiceArray > (int)indexArray->len){
+            respondErrorMessage("tmp/writeServerFIFO");
+            break;
+        }
+        freeIndex(g_array_index(indexArray,Index*, indiceArray));
+        g_array_index(indexArray,Index*, indiceArray) = NULL;
+        respondMessageRemove("tmp/writeServerFIFO",indiceArray);
+    }   
     break;
     default:
         break;
