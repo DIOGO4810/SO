@@ -1,0 +1,6 @@
+Gdataset/
+bin/dclient
+bin/dserver
+
+obj/*.o
+obj/utils/*.o
