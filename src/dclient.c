@@ -12,8 +12,12 @@
 
 
 void getServerMessage(char** argv, int fd) {
+    pid_t mypid = getpid();
+    char diretoria[256];
+    sprintf(diretoria,"tmp/writeServerFIFO%d",mypid);
+    printf("mm%s\n",diretoria);
     while (1) {
-        fd = open("tmp/writeServerFIFO", O_RDONLY);
+        fd = open(diretoria, O_RDONLY);
         if (fd == -1) continue;
 
         char command = argv[1][1]; 
@@ -75,14 +79,14 @@ int main(int argc, char *argv[])
     case 'a':
 
         fd = open("tmp/writeClientFIFO",O_WRONLY);
-        char *metaDados = concatInput(argc, argv, "%s %s %s %s %s", argv[1], argv[2], argv[3],argv[4],argv[5]);
+        char *metaDados = concatInput(argc, argv, "%s %s %s %s %s %d ", argv[1], argv[2], argv[3],argv[4],argv[5],getpid());
         (void) write(fd,metaDados,strlen(metaDados));
         free(metaDados);
         close(fd);
         break;
     case 'c':
         fd = open("tmp/writeClientFIFO",O_WRONLY);
-        char *indiceConsulta = concatInput(argc, argv, "%s %d ", argv[1], atoi(argv[2]));
+        char *indiceConsulta = concatInput(argc, argv, "%s %d %d ", argv[1], atoi(argv[2]),getpid());
         (void) write(fd,indiceConsulta,strlen(indiceConsulta));
         free(indiceConsulta);
         close(fd);
@@ -91,7 +95,7 @@ int main(int argc, char *argv[])
 
     case 'd':
         fd = open("tmp/writeClientFIFO",O_WRONLY);
-        char *indiceRemove = concatInput(argc, argv, "%s %d ", argv[1], atoi(argv[2]));
+        char *indiceRemove = concatInput(argc, argv, "%s %d %d ", argv[1], atoi(argv[2]),getpid());
         (void) write(fd,indiceRemove,strlen(indiceRemove));
         free(indiceRemove);
         close(fd);
