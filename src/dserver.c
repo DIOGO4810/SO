@@ -210,7 +210,6 @@ void handleInput(char **tokens, GArray *indexArray)
             Index *indice = g_array_index(indexArray, Index *, i);
             char absoluteDirectory[256] = "";
             sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
-            printf("dir%s\n",absoluteDirectory);
             pid_t pid;
             if ((pid = fork()) == 0)
             {
@@ -220,12 +219,11 @@ void handleInput(char **tokens, GArray *indexArray)
             else
             {
                 int status;
-                waitpid(pid, &status, 0);
+                waitpid(pid, &status, 0);//Sincronizador do código assincrono
 
                 if (WIFEXITED(status))
                 {
                     int exit_status = WEXITSTATUS(status);
-                    printf("grep exit status: %d\n", exit_status);
                     if (exit_status == 0)
                     {
                         g_array_append_val(ret, i);
