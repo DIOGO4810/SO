@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <glib.h>
+
 
 char *removeAspas(char *str)
 {
@@ -37,4 +42,44 @@ char *concatInput(int argc, char **input, const char *format, ...)
 
     free(inputSemAspas);
     return ret;
+}
+
+
+
+void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
+    mkfifo(fifoPath, 0666);
+
+    int fd = open(fifoPath, O_WRONLY);
+    if (fd == -1) {
+        perror("Erro ao abrir FIFO");
+        return;
+    }
+
+    char buffer[1024] = "[";
+    char temp[32];
+
+    for (guint i = 0; i < array->len; i++) {
+        snprintf(temp, sizeof(temp), "%d", g_array_index(array, int, i));
+        strcat(buffer, temp);
+        if (i < array->len - 1) strcat(buffer, ",");
+    }
+    strcat(buffer, "]\n");
+
+    write(fd, buffer, strlen(buffer));
+    
+    close(fd);
+}
+
+
+void printGArray(GArray *array)
+{
+    printf("[");
+
+    for (guint i = 0; i < array->len; i++)
+    {
+        int item = g_array_index(array, int, i);
+        printf("%d,",item);
+    }
+    printf("]\n");
+
 }

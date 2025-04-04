@@ -3,9 +3,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include<sys/wait.h>
 #include <signal.h>
 #include <glib.h>
 #include "parser.h"
+#include "utils.h"
 
 typedef struct index
 {
@@ -71,7 +73,7 @@ void respondMessageAdiciona(char *diretoria, guint arraySize)
     mkfifo(diretoria, 0666);
     pid_t fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Document %d indexed", (int)arraySize - 1);
+    sprintf(message, "Document %d indexed\n", (int)arraySize - 1);
     (void)write(fdmessage, message, strlen(message));
     close(fdmessage);
     free(message);
@@ -104,7 +106,7 @@ void respondMessageRemove(char *diretoria, int indice)
     mkfifo(diretoria, 0666);
     pid_t fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Index entry %d deleted", indice);
+    sprintf(message, "Index entry %d deleted\n", indice);
     (void)write(fdmessage, message, strlen(message));
     close(fdmessage);
     free(message);
@@ -156,24 +158,85 @@ void handleInput(char **tokens, GArray *indexArray)
             respondErrorMessage(diretoria);
             break;
         }
+        if (g_array_index(indexArray, Index *, indiceArray) == NULL)
+        {
+            respondErrorMessage(diretoria);
+            break;
+        }
         freeIndex(g_array_index(indexArray, Index *, indiceArray));
         g_array_index(indexArray, Index *, indiceArray) = NULL;
         respondMessageRemove(diretoria, indiceArray);
     }
     break;
-    // case 'l':
-    // {
-    //     int indiceArray = atoi(tokens[1]);
-    //     sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
+    case 'l':
+    {
+        int indiceArray = atoi(tokens[1]);
+        sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
 
-    //     if (indiceArray < 0 || indiceArray > (int)indexArray->len)
-    //     {
-    //         respondErrorMessage(diretoria);
-    //         break;
-    //     }
-    //     Index* indice = g_array_index(indexArray, Index *, indiceArray);
-    // }
-    // break;
+        if (indiceArray < 0 || indiceArray > (int)indexArray->len)
+        {
+            respondErrorMessage(diretoria);
+            break;
+        }
+        if (g_array_index(indexArray, Index *, indiceArray) == NULL)
+        {
+            respondErrorMessage(diretoria);
+            break;
+        }
+        Index *indice = g_array_index(indexArray, Index *, indiceArray);
+        char absoluteDirectory[256] = "";
+        sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
+        pid_t pid;
+        mkfifo(diretoria, 0666);
+        if ((pid = fork()) == 0)
+        {
+            pid_t fdmessage = open(diretoria, O_WRONLY);
+            dup2(fdmessage, 1);
+            close(fdmessage);
+            execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
+            exit(1);
+        }
+    }
+    break;
+
+    case 's':
+    {
+        sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
+        GArray *ret = g_array_new(FALSE, FALSE, sizeof(int));
+        for (guint i = 0; i < indexArray->len; i++)
+        {
+            if (g_array_index(indexArray, Index *, i) == NULL)
+                continue;
+            Index *indice = g_array_index(indexArray, Index *, i);
+            char absoluteDirectory[256] = "";
+            sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
+            printf("dir%s\n",absoluteDirectory);
+            pid_t pid;
+            if ((pid = fork()) == 0)
+            {
+                execl("/usr/bin/grep", "grep", "-q", tokens[1], absoluteDirectory, NULL);
+                exit(0);
+            }
+            else
+            {
+                int status;
+                waitpid(pid, &status, 0);
+
+                if (WIFEXITED(status))
+                {
+                    int exit_status = WEXITSTATUS(status);
+                    printf("grep exit status: %d\n", exit_status);
+                    if (exit_status == 0)
+                    {
+                        g_array_append_val(ret, i);
+                    }
+                }
+            }
+        }
+            
+        writeGArrayToFIFO(ret,diretoria);
+        break;
+    }
     default:
         break;
     }
@@ -189,10 +252,8 @@ int checkAsync(char *input)
 int main()
 {
     // struct sigaction sa;
-    // sa.sa_handler = SIG_IGN;  
+    // sa.sa_handler = SIG_IGN;
     // sigaction(SIGCHLD, &sa, NULL);
-
-    
 
     GArray *indexArray = g_array_new(FALSE, FALSE, sizeof(Index *));
     while (1)
