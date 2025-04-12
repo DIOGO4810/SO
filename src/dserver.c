@@ -246,6 +246,29 @@ int checkAsync(char *input)
     return 1 ;
 }
 
+void writeDeadPid(){
+    char pidstr[10];
+    sprintf(pidstr, "%d ", getpid());
+    int fdWR = open("tmp/killzombies",O_RDWR);
+    int fdW = open("tmp/killzombies",O_WRONLY);
+    write(fdW, pidstr, strlen(pidstr));
+    close(fdWR);
+    close(fdW);
+
+}
+
+
+int readDeadPid(char* zombiepid){
+    int fdWR = open("tmp/killzombies",O_RDWR);
+    int fdW = open("tmp/killzombies",O_WRONLY);
+    int fdR = open("tmp/killzombies",O_RDONLY);
+    close(fdW);
+    close(fdWR);
+    int nbytes = read(fdR, zombiepid, 256);
+
+    return nbytes;
+}
+
 
 int main() {
     GArray *indexArray = g_array_new(FALSE, FALSE, sizeof(Index *));
@@ -263,73 +286,39 @@ int main() {
         }
 
         char clientInput[512] = "";
-        read(fd, clientInput, 512);
+        char zombiepid[256] = "";
 
+        read(fd, clientInput, 512);
         printf("O cliente mandou isto:%s\n", clientInput);
         
-        int fdWR = open("tmp/killzombies",O_RDWR);
-        int fdW = open("tmp/killzombies",O_WRONLY);
-        int fdR = open("tmp/killzombies",O_RDONLY);
-        printf("opens passaram\n");
-        
-        char zombiepid[256] = "";
-        
-        close(fdW);
-        close(fdWR);
-        int nbytes = read(fdR, zombiepid, 256);
-        printf("bytes lidos: %d\n", nbytes);
+        int nbytes = readDeadPid(zombiepid);
         
         if (nbytes > 0) {
-            printf("linha%s\n",zombiepid);
             Parser *parseZombies = newParser();
             parseZombies = parser(parseZombies, zombiepid);
             char **tokens = getTokens(parseZombies);
             int size = getNumTokens(parseZombies);
-            printf("size:%d\n",size);
-            for (int i = 0; i <size ; i++)
-            {
-                printf("token%s\n",tokens[i]);
-                int morto = waitpid(atoi(tokens[i]), &status, 0);  
-                printf("Filho morto: %d\n", morto);
+
+            for (int i = 0; i <size ; i++){     
+                int morto = waitpid(atoi(tokens[i]), &status, 0);                  
+                printf("Processo zombie morto:%d\n",morto);
             }
             
         }
 
+        
 
         int isAsync = checkAsync(clientInput);
         if (isAsync) {
             pid_t pid;
             if ((pid = fork()) == 0) {    
      
-                
-                
-                
                 Parser *parseFIFO = newParser();
                 parseFIFO = parser(parseFIFO, clientInput);
                 char **tokens = getTokens(parseFIFO);
-
                 handleInput(tokens, indexArray);
-
-
-                char pidstr[10];
-                sprintf(pidstr, "%d ", getpid());
-                printf("Escrever PID: %s\n", pidstr);
-
-                
-                
-                
-                sleep(10);
-                
-                
-                
-                
-                int fdWR = open("tmp/killzombies",O_RDWR);
-                int fdW = open("tmp/killzombies",O_WRONLY);
-                int escreveu = write(fdW, pidstr, strlen(pidstr));
-                printf("Bytes escritos: %d\n", escreveu);
-                
-                close(fdWR);
-                close(fdW);
+                sleep(5);
+                writeDeadPid();
 
                 freeParser(parseFIFO);
                 exit(0);
