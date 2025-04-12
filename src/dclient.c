@@ -17,6 +17,7 @@ void getServerMessage(char **argv, int fd)
     sprintf(diretoria, "tmp/writeServerFIFO%d", mypid);
     while (1)
     {
+
         fd = open(diretoria, O_RDONLY);
         if (fd == -1)
             continue;
@@ -29,6 +30,7 @@ void getServerMessage(char **argv, int fd)
         {
             char serverOutput[256] = "";
             (void)read(fd, serverOutput, 256);
+
             write(1, serverOutput, strlen(serverOutput)); 
             break;
         }

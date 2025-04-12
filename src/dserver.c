@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include<sys/wait.h>
-#include <signal.h>
 #include <glib.h>
 #include "parser.h"
 #include "utils.h"
@@ -71,7 +70,7 @@ void printGArrayIndex(GArray *array)
 void respondMessageAdiciona(char *diretoria, guint arraySize)
 {
     mkfifo(diretoria, 0666);
-    pid_t fdmessage = open(diretoria, O_WRONLY);
+    int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "Document %d indexed\n", (int)arraySize - 1);
     (void)write(fdmessage, message, strlen(message));
@@ -82,7 +81,7 @@ void respondMessageAdiciona(char *diretoria, guint arraySize)
 void respondMessageConsulta(char *diretoria, Index *indice)
 {
     mkfifo(diretoria, 0666);
-    pid_t fdmessage = open(diretoria, O_WRONLY);
+    int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "%s %s %d %s", indice->title, indice->author, indice->year, indice->path);
     (void)write(fdmessage, message, strlen(message));
@@ -93,7 +92,7 @@ void respondMessageConsulta(char *diretoria, Index *indice)
 void respondErrorMessage(char *diretoria)
 {
     mkfifo(diretoria, 0666);
-    pid_t fdmessage = open(diretoria, O_WRONLY);
+    int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "404");
     (void)write(fdmessage, message, strlen(message));
@@ -104,7 +103,7 @@ void respondErrorMessage(char *diretoria)
 void respondMessageRemove(char *diretoria, int indice)
 {
     mkfifo(diretoria, 0666);
-    pid_t fdmessage = open(diretoria, O_WRONLY);
+    int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "Index entry %d deleted\n", indice);
     (void)write(fdmessage, message, strlen(message));
@@ -190,7 +189,7 @@ void handleInput(char **tokens, GArray *indexArray)
         mkfifo(diretoria, 0666);
         if ((pid = fork()) == 0)
         {
-            pid_t fdmessage = open(diretoria, O_WRONLY);
+            int fdmessage = open(diretoria, O_WRONLY);
             dup2(fdmessage, 1);
             close(fdmessage);
             execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
@@ -244,66 +243,119 @@ int checkAsync(char *input)
 {
     if (input[1] == 'a' || input[1] == 'd' || input[1] == 'f')
         return 0;
-    return 1;
+    return 1 ;
 }
 
-int main()
-{
-    // struct sigaction sa;
-    // sa.sa_handler = SIG_IGN;
-    // sigaction(SIGCHLD, &sa, NULL);
 
+int main() {
     GArray *indexArray = g_array_new(FALSE, FALSE, sizeof(Index *));
-    while (1)
-    {
-        pid_t fd = open("tmp/writeClientFIFO", O_RDONLY);
-        if (fd == -1)
-        {
+    int fd;
+
+    int status;
+
+    mkfifo("tmp/killzombies",0666);
+
+    while (1) {
+        fd = open("tmp/writeClientFIFO", O_RDONLY);
+        
+        if (fd == -1) {
             continue;
         }
 
         char clientInput[512] = "";
         read(fd, clientInput, 512);
+
         printf("O cliente mandou isto:%s\n", clientInput);
+        
+        int fdWR = open("tmp/killzombies",O_RDWR);
+        int fdW = open("tmp/killzombies",O_WRONLY);
+        int fdR = open("tmp/killzombies",O_RDONLY);
+        printf("opens passaram\n");
+        
+        char zombiepid[256] = "";
+        
+        close(fdW);
+        close(fdWR);
+        int nbytes = read(fdR, zombiepid, 256);
+        printf("bytes lidos: %d\n", nbytes);
+        
+        if (nbytes > 0) {
+            printf("linha%s\n",zombiepid);
+            Parser *parseZombies = newParser();
+            parseZombies = parser(parseZombies, zombiepid);
+            char **tokens = getTokens(parseZombies);
+            int size = getNumTokens(parseZombies);
+            printf("size:%d\n",size);
+            for (int i = 0; i <size ; i++)
+            {
+                printf("token%s\n",tokens[i]);
+                int morto = waitpid(atoi(tokens[i]), &status, 0);  
+                printf("Filho morto: %d\n", morto);
+            }
+            
+        }
+
 
         int isAsync = checkAsync(clientInput);
-        if (isAsync)
-        {
+        if (isAsync) {
             pid_t pid;
-            if ((pid = fork()) == 0)
-            {
+            if ((pid = fork()) == 0) {    
+     
+                
+                
+                
                 Parser *parseFIFO = newParser();
                 parseFIFO = parser(parseFIFO, clientInput);
                 char **tokens = getTokens(parseFIFO);
 
                 handleInput(tokens, indexArray);
 
+
+                char pidstr[10];
+                sprintf(pidstr, "%d ", getpid());
+                printf("Escrever PID: %s\n", pidstr);
+
+                
+                
+                
+                sleep(10);
+                
+                
+                
+                
+                int fdWR = open("tmp/killzombies",O_RDWR);
+                int fdW = open("tmp/killzombies",O_WRONLY);
+                int escreveu = write(fdW, pidstr, strlen(pidstr));
+                printf("Bytes escritos: %d\n", escreveu);
+                
+                close(fdWR);
+                close(fdW);
+
                 freeParser(parseFIFO);
                 exit(0);
-            }
-            else
+            } else {
                 continue;
+            }
         }
+
+
 
         Parser *parseFIFO = newParser();
         parseFIFO = parser(parseFIFO, clientInput);
         char **tokens = getTokens(parseFIFO);
 
-        if (tokens[0][1] == 'f')
-        {
+        if (tokens[0][1] == 'f') {
             freeParser(parseFIFO);
             close(fd);
             break;
         }
 
         handleInput(tokens, indexArray);
-
         freeParser(parseFIFO);
-        close(fd);
     }
 
+    close(fd);
     printGArrayIndex(indexArray);
-
     freeEstrutura(indexArray);
 
     return 0;

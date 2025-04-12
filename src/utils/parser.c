@@ -14,6 +14,8 @@ struct parser
     char* line;
 
     char **tokens;
+
+    int numtokens;
 };
 
 
@@ -21,8 +23,9 @@ struct parser
 Parser *newParser()
 {
     Parser *parserE = malloc(sizeof(struct parser));
-    parserE->tokens = malloc(MaxTokensSize * sizeof(char *));
+    parserE->tokens = malloc(MaxTokensSize * sizeof(char *));    
     parserE->line = NULL;
+    parserE->numtokens = 0;
     return parserE;
 }
 
@@ -44,7 +47,7 @@ Parser *parser(Parser *parserE,char* line)
         parserE->tokens[i++] = token;
         token = strsep(&lineCopy, " ");
     }
-
+    parserE->numtokens = i-1;
     return parserE;
 }
 
@@ -61,4 +64,9 @@ char** getTokens(Parser * parserE)
   if (parserE->tokens[0]==NULL) return NULL;
 
     return parserE->tokens;
+}
+
+
+int getNumTokens(Parser * parserE){
+    return parserE->numtokens;
 }
