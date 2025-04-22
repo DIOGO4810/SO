@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     switch (argv[1][1])
     {
     case 'a':
-
+        if(!validaInput(argv))return 0;
         fd = open("tmp/writeClientFIFO", O_WRONLY);
         char *metaDados = concatInput(argc, argv, "%s %s %s %s %s %d ", argv[1], argv[2], argv[3], argv[4], argv[5], getpid());
         (void)write(fd, metaDados, strlen(metaDados));
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
         fd = open("tmp/writeClientFIFO", O_WRONLY);
         (void)write(fd, argv[1], strlen(argv[1]));
         close(fd);
-
+        
         break;
     case 'l':
         fd = open("tmp/writeClientFIFO", O_WRONLY);

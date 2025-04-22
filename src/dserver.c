@@ -285,10 +285,10 @@ int main() {
             continue;
         }
 
-        char clientInput[512] = "";
+        char clientInput[1024] = "";
         char zombiepid[256] = "";
 
-        read(fd, clientInput, 512);
+        read(fd, clientInput, 1024);
         printf("O cliente mandou isto:%s\n", clientInput);
         
         int nbytes = readDeadPid(zombiepid);

@@ -83,3 +83,31 @@ void printGArray(GArray *array)
     printf("]\n");
 
 }
+
+
+
+int validaInput(char** argv) {
+    int titleSize = strlen(argv[2]);
+    int authorsSize = strlen(argv[3]); 
+    int yearSize = strlen(argv[4]);
+    int pathSize = strlen(argv[5]);
+
+    if (titleSize > 200) {
+        printf("Erro: O título é demasiado longo (máximo 200 caracteres).\n");
+        return 0;
+    }
+    if (authorsSize > 200) {
+        printf("Erro: Os autores têm demasiados caracteres (máximo 200 caracteres).\n");
+        return 0;
+    }
+    if (yearSize > 4) {
+        printf("Erro: O ano deve ter no máximo 4 dígitos.\n");
+        return 0;
+    }
+    if (pathSize > 64) {
+        printf("Erro: O caminho é demasiado longo (máximo 64 caracteres).\n");
+        return 0;
+    }
+
+    return 1;
+}
