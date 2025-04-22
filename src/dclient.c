@@ -41,7 +41,7 @@ void getServerMessage(char **argv, int fd)
             (void)read(fd, serverOutput, 512);
 
             Parser *parseFIFO = newParser();
-            parseFIFO = parser(parseFIFO, serverOutput);
+            parseFIFO = parser(parseFIFO, serverOutput, ' ');
             char **tokens = getTokens(parseFIFO);
 
             if (atoi(tokens[0]) == 404)

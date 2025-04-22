@@ -5,7 +5,7 @@ typedef struct parser Parser;
 
 Parser *newParser();
 
-Parser *parser(Parser *parserE,char* line);
+Parser *parser(Parser *parserE,char* line,char limitador);
 
 void freeParser(Parser *parserE);
 

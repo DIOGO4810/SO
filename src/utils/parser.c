@@ -29,7 +29,7 @@ Parser *newParser()
     return parserE;
 }
 
-Parser *parser(Parser *parserE,char* line)
+Parser *parser(Parser *parserE,char* line,char limitador)
 {
 
 
@@ -40,12 +40,12 @@ Parser *parser(Parser *parserE,char* line)
     int i = 0;
 
     // Divide a linha em tokens usando strsep
-    char *token = strsep(&lineCopy, " ");
+    char *token = strsep(&lineCopy, &limitador);
     while (token != NULL && i < MaxTokensSize)
     {
         // Armazenar o token no array
         parserE->tokens[i++] = token;
-        token = strsep(&lineCopy, " ");
+        token = strsep(&lineCopy, &limitador);
     }
     parserE->numtokens = i-1;
     return parserE;
