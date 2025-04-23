@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <glib.h>
 
@@ -84,6 +85,12 @@ void printGArray(GArray *array)
 
 }
 
+int isDigitsOnly(char* str) {
+    for (int i = 0; str[i]; i++) {
+        if (!isdigit(str[i])) return 0;
+    }
+    return 1;
+}
 
 
 int validaInput(char** argv) {
@@ -92,11 +99,11 @@ int validaInput(char** argv) {
     int yearSize = strlen(argv[4]);
     int pathSize = strlen(argv[5]);
 
-    if (titleSize > 200) {
+    if (titleSize > 250) {
         printf("Erro: O título é demasiado longo (máximo 200 caracteres).\n");
         return 0;
     }
-    if (authorsSize > 200) {
+    if (authorsSize > 100) {
         printf("Erro: Os autores têm demasiados caracteres (máximo 200 caracteres).\n");
         return 0;
     }
@@ -104,7 +111,7 @@ int validaInput(char** argv) {
         printf("Erro: O ano deve ter no máximo 4 dígitos.\n");
         return 0;
     }
-    if (pathSize > 64) {
+    if (pathSize > 100) {
         printf("Erro: O caminho é demasiado longo (máximo 64 caracteres).\n");
         return 0;
     }

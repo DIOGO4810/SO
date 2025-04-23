@@ -3,9 +3,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include "dserver.h"
 
-void writeCsv(char** tokens) {
-    int fd = open("indexs.csv", O_WRONLY | O_APPEND | O_CREAT, 0666);
+void writeDisco(Index* indice) {
+    int fd = open("indexs", O_WRONLY | O_APPEND | O_CREAT, 0666);
     if (fd == -1) {
         perror("Erro ao abrir o ficheiro");
         return;
@@ -13,55 +14,86 @@ void writeCsv(char** tokens) {
 
     lseek(fd, 0, SEEK_END);
 
-    int wroteSomething = 0;
-
-    for (int i = 1; tokens[i] != NULL; i++) {
-        if (tokens[i][0] == '\0') continue; // ignora tokens vazios
-
-        if (wroteSomething) {
-            write(fd, ";", 1); // só escreve ; se já escreveu algo antes
-        }
-
-        write(fd, tokens[i], strlen(tokens[i]));
-        wroteSomething = 1;
-    }
-
-    write(fd, "\n", 1);
+    write(fd,indice,getStructSize());
+    
     close(fd);
 }
 
 
-char* searchCsv(int pidCliente) {
-    int fd = open("indexs.csv", O_RDONLY);
+Index* searchDisco(int ordem) {
+    int fd = open("indexs", O_RDONLY);
     if (fd == -1) {
         perror("Erro ao abrir ficheiro");
         return NULL;
     }
 
-    // Tento ler o ficheiro inteiro de uma vez
-    char buffer[4096];
-    ssize_t bytesRead = read(fd, buffer, sizeof(buffer) - 1);
-    if (bytesRead <= 0) {
+    Index* indice = malloc(getStructSize()); 
+    if (indice == NULL) {
+        perror("Erro ao alocar memória");
         close(fd);
-        return NULL;  
+        return NULL;
     }
-    buffer[bytesRead] = '\0'; 
 
-   
+    lseek(fd,(ordem-1)*getStructSize(),SEEK_SET);
+    int bytesRead = read(fd,indice,getStructSize());
+    if(bytesRead > 0)return indice;
+
+    close(fd);
+    free(indice);  
+    return NULL;
+}
+
+
+
+
+int removeCsvLine(int pidCliente) {
+    int fd = open("indexs.csv", O_RDWR);
+    if (fd == -1) {
+        perror("Erro ao abrir o ficheiro");
+        return -1;
+    }
+
     char pidStr[16];
     snprintf(pidStr, sizeof(pidStr), "%d", pidCliente);
 
-    // Divide o ficheiro lido em linhas
-    char* linha = strtok(buffer, "\n");
-    while (linha != NULL) {
-        if (strstr(linha, pidStr) != NULL) {
-            close(fd);
-            return strdup(linha);  
-        }
-        linha = strtok(NULL, "\n");  // Next line
+    char buffer[4096];
+    ssize_t bytesRead = read(fd, buffer, 4096 - 1);
+    if (bytesRead < 0) {
+        perror("Erro ao ler o ficheiro");
+        close(fd);
+        return -1;
+    }
+    buffer[bytesRead] = '\0';
+
+    // Encontra a linha a remover
+    char* output = malloc(4096);
+    if (!output) {
+        perror("Erro de memória");
+        close(fd);
+        return -1;
     }
 
-    
+    char* saveptr;
+    char* linha = strtok_r(buffer, "\n", &saveptr);
+    ssize_t newLen = 0;
+    int found = 0;
+
+    while (linha != NULL) {
+        if (strstr(linha, pidStr) == NULL) {
+            ssize_t len = snprintf(output + newLen, 4096 - newLen, "%s\n", linha);
+            newLen += len;
+        }else {
+            found = 1;
+        }
+        linha = strtok_r(NULL, "\n", &saveptr);
+    }
+    if (found == 0)return 1;
+    // Volta ao início, escreve novo conteúdo, e corta o ficheiro
+    lseek(fd, 0, SEEK_SET);
+    write(fd, output, newLen);
+    ftruncate(fd, newLen);
+
+    free(output);
     close(fd);
-    return NULL;
+    return 0;
 }

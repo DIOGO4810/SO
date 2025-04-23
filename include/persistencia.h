@@ -1,10 +1,12 @@
 #ifndef PERSISTENCIA_H
 #define PERSISTENCIA_H
+#include "dserver.h"
+
+void writeDisco(Index* indice);
 
 
-void writeCsv(char** tokens);
+Index* searchDisco(int ordem);
 
-
-char* searchCsv(int pidCliente);
+int removeCsvLine(int pidCliente);
 
 #endif 

@@ -39,10 +39,10 @@ void getServerMessage(char **argv, int fd)
         {
             char serverOutput[512] = "";
             (void)read(fd, serverOutput, 512);
-
             Parser *parseFIFO = newParser();
             parseFIFO = parser(parseFIFO, serverOutput, ' ');
             char **tokens = getTokens(parseFIFO);
+            
 
             if (atoi(tokens[0]) == 404)
             {
@@ -50,10 +50,10 @@ void getServerMessage(char **argv, int fd)
                 freeParser(parseFIFO);
                 break;
             }
-
+            
             char output[512];
             snprintf(output, sizeof(output), "Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",
-                     tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
+            tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
             write(1, output, strlen(output)); 
 
             freeParser(parseFIFO);
@@ -148,7 +148,12 @@ int main(int argc, char *argv[])
         break;
     case 's':
         fd = open("tmp/writeClientFIFO", O_WRONLY);
-        char *indiceSearch = concatInput(argc, argv, "%s %s %d ", argv[1], argv[2], getpid());
+        char *indiceSearch;
+        if(argc == 4){
+            indiceSearch = concatInput(argc, argv, "%s %s n%s %d ", argv[1], argv[2], argv[3],getpid());
+        }else{            
+            indiceSearch = concatInput(argc, argv, "%s %s %d ", argv[1], argv[2], getpid());
+        }
         (void)write(fd, indiceSearch, strlen(indiceSearch));
         close(fd);
 
