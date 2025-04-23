@@ -67,6 +67,25 @@ int getStructSize(){
     return sizeof(Index);
 }
 
+int getOrder(Index* indice){
+    return indice->order;
+}
+
+Index* getDeletedIndex() {
+    Index* deleted = malloc(sizeof(Index));
+    if (!deleted) return NULL; 
+
+    strcpy(deleted->title, "");
+    strcpy(deleted->author, "");
+    strcpy(deleted->path, "");
+    deleted->year = 0;
+    deleted->order = -1;
+    deleted->pidCliente = -1;
+
+    return deleted;
+}
+
+
 
 void freeEstrutura(GArray *estrutura)
 {
@@ -231,9 +250,11 @@ GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
         return indexArray;
     }
     Index* indice = malloc(sizeof(Index));
-    while (read(fd, indice, sizeof(Index)) > 0) {
+    ssize_t bytesRead;
+    while ((bytesRead = read(fd, indice, sizeof(Index))) == sizeof(Index)) {
+        if (indice->pidCliente == -1) continue;
+    
         if (!g_hash_table_contains(cache, indice)) {
-            
             Index* copia = malloc(sizeof(Index));
             memcpy(copia, indice, sizeof(Index));
             g_array_append_val(indexArray, copia);
@@ -300,21 +321,19 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         int pidCliente = atoi(tokens[2]);
         int pidBusca =  atoi(tokens[1]);
         sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
-        int found = -1;
+        int notFound = -1;
         Index* indice = g_hash_table_lookup(cache,&pidBusca);
 
-        if (indice == NULL){
-            found = removeCsvLine(pidBusca);
-            if(found == 1){
-                respondErrorMessage(diretoria);
-                break;
-            }
-            respondMessageRemove(diretoria,pidBusca);
-        }else{
+        if (indice != NULL){
             g_hash_table_remove(cache,&pidBusca);
-            found = removeCsvLine(pidBusca);
-            respondMessageRemove(diretoria,pidBusca);
+            
         }
+        notFound = removeDisco(pidBusca);
+        if(notFound == 1){
+            respondErrorMessage(diretoria);
+            break;
+        }
+        respondMessageRemove(diretoria,pidBusca);
 
     }
     break;

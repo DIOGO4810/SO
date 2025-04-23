@@ -36,64 +36,50 @@ Index* searchDisco(int ordem) {
 
     lseek(fd,(ordem-1)*getStructSize(),SEEK_SET);
     int bytesRead = read(fd,indice,getStructSize());
-    if(bytesRead > 0)return indice;
+    if(bytesRead == 0 || getPidCliente(indice) == -1){
+        free(indice);  
+        return NULL;
+    }
 
     close(fd);
-    free(indice);  
-    return NULL;
+    return indice;
 }
 
 
 
 
-int removeCsvLine(int pidCliente) {
-    int fd = open("indexs.csv", O_RDWR);
+int removeDisco(int ordem) {
+    int fd = open("indexs", O_RDWR);
     if (fd == -1) {
         perror("Erro ao abrir o ficheiro");
         return -1;
     }
 
-    char pidStr[16];
-    snprintf(pidStr, sizeof(pidStr), "%d", pidCliente);
-
-    char buffer[4096];
-    ssize_t bytesRead = read(fd, buffer, 4096 - 1);
-    if (bytesRead < 0) {
-        perror("Erro ao ler o ficheiro");
-        close(fd);
-        return -1;
-    }
-    buffer[bytesRead] = '\0';
-
-    // Encontra a linha a remover
-    char* output = malloc(4096);
-    if (!output) {
-        perror("Erro de memória");
+    Index* indice = malloc(getStructSize());
+    if (!indice) {
+        perror("Erro de alocação");
         close(fd);
         return -1;
     }
 
-    char* saveptr;
-    char* linha = strtok_r(buffer, "\n", &saveptr);
-    ssize_t newLen = 0;
-    int found = 0;
+    off_t offset = (ordem - 1) * getStructSize();
+    lseek(fd, offset, SEEK_SET);
 
-    while (linha != NULL) {
-        if (strstr(linha, pidStr) == NULL) {
-            ssize_t len = snprintf(output + newLen, 4096 - newLen, "%s\n", linha);
-            newLen += len;
-        }else {
-            found = 1;
-        }
-        linha = strtok_r(NULL, "\n", &saveptr);
+    int bytesRead = read(fd, indice, getStructSize());
+    if (bytesRead <= 0) {
+        free(indice);
+        close(fd);
+        return 1;  // Linha não existe
     }
-    if (found == 0)return 1;
-    // Volta ao início, escreve novo conteúdo, e corta o ficheiro
-    lseek(fd, 0, SEEK_SET);
-    write(fd, output, newLen);
-    ftruncate(fd, newLen);
 
-    free(output);
+    // Substituir por uma struct marcada como deletada
+    Index* deleted = getDeletedIndex();
+    lseek(fd, offset, SEEK_SET);
+    write(fd, deleted, getStructSize());
+
+    free(indice);
+    free(deleted);
     close(fd);
+
     return 0;
 }

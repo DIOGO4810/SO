@@ -7,6 +7,6 @@ void writeDisco(Index* indice);
 
 Index* searchDisco(int ordem);
 
-int removeCsvLine(int pidCliente);
+int removeDisco(int ordem);
 
 #endif 

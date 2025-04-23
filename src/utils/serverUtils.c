@@ -8,6 +8,24 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "dserver.h"
+#include "parser.h"
+
+void parseBufferToIntArray(char *buffer,GArray* ret) {
+
+    Parser *parserObj = newParser();
+    parserObj = parser(parserObj, buffer, ' ');
+    char **tokens = getTokens(parserObj);
+    int size = getNumTokens(parserObj);
+
+    for (int i = 0; i < size; i++) {
+        int val = atoi(tokens[i]);
+        g_array_append_val(ret, val);
+    }
+
+    freeParser(parserObj);
+}
+
+
 
 void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int numProcesses)
 {
@@ -51,12 +69,11 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
                 waitpid(grepPid, &status, 0);  
                 if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
                 {
-                    int pidCliente = getPidCliente(indice);
                     char pidstr[64];
 
-                    sprintf(pidstr,"%d ",pidCliente);
+                    sprintf(pidstr,"%d ",getOrder(indice));
                     int wstat =  write(fifoWrite, pidstr, strlen(pidstr));
-                    printf("write status: %d\n",wstat);
+                    
                 }
             }
 
@@ -74,7 +91,7 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
     }
 
 
-    printf("dpasd\n");
+
         // Espera todos os filhos terminarem
         for (int p = 0; p < numProcesses; p++)
         {
@@ -86,9 +103,9 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
             }
         }
 
-        printf("mmmmmmmmm\n");
+ 
 
-    int fifoRead = open(fifoPath, O_RDWR);
+        int fifoRead = open(fifoPath, O_RDWR);
         if (fifoRead == -1)
         {
             perror("Erro ao abrir FIFO para leitura");
@@ -98,7 +115,8 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
     
         char buffer[4096];
         read(fifoRead, buffer, 4096);
-        printf("PID Cliente com match: %s\n", buffer);
+        parseBufferToIntArray(buffer,ret);
+
     
         close(fifoRead);
 
