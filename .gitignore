@@ -4,6 +4,7 @@ bin/dserver
 
 obj/*.o
 obj/utils/*.o
+obj/serverUtils/*.o
 
 indexs
 
