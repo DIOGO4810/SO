@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include "parser.h"
 
-#define MaxTokensSize 12
 
 struct parser
 {
@@ -16,16 +15,19 @@ struct parser
     char **tokens;
 
     int numtokens;
+
+    int maxNumTokens;
 };
 
 
 // Função que cria e aloca memoria para a estrutura e os campos do Parser
-Parser *newParser()
+Parser *newParser(int numTokensMax)
 {
     Parser *parserE = malloc(sizeof(struct parser));
-    parserE->tokens = malloc(MaxTokensSize * 200);    
+    parserE->tokens = malloc(numTokensMax * 128);    
     parserE->line = NULL;
     parserE->numtokens = 0;
+    parserE->maxNumTokens = numTokensMax;
     return parserE;
 }
 
@@ -44,7 +46,7 @@ Parser *parser(Parser *parserE, char *line, char limitador) {
 
     int i = 0;
     char *token = strsep(&lineCopy, delimStr);
-    while (token != NULL && i < MaxTokensSize) {
+    while (token != NULL && i < parserE->maxNumTokens) {
         parserE->tokens[i++] = token;
         token = strsep(&lineCopy, delimStr);
     }

@@ -58,6 +58,7 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
 
     char buffer[16384] = "[";
     for (guint i = 0; i < array->len; i++) {
+        if(g_array_index(array, int, i) == 0 && array->len == 1)break;
         char temp[32] = "";
         snprintf(temp, sizeof(temp), "%d", g_array_index(array, int, i));
         strcat(buffer, temp);

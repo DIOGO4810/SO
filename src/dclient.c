@@ -54,7 +54,7 @@ void getServerMessage(char **argv, int fd)
                 break;
             }
 
-            Parser *parseFIFO = newParser();
+            Parser *parseFIFO = newParser(10);
             parseFIFO = parser(parseFIFO, serverOutput, '|');
             char **tokens = getTokens(parseFIFO);
             

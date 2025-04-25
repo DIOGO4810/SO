@@ -10,6 +10,7 @@
 #include "persistencia.h"
 #include "dserver.h"
 #include "serverUtils.h"
+#include "lruCache.h"
 
 struct index
 {
@@ -146,7 +147,7 @@ void respondMessageConsulta(char *diretoria, Index *indice)
 
 void respondErrorMessage(char *diretoria)
 {
-    int error = mkfifo(diretoria, 0666);
+    mkfifo(diretoria, 0666);
     int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "404");
@@ -236,15 +237,8 @@ void findIndexsMatch(GArray* ret, char* match,GArray* indexArray){
 
 
 
-GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
-    GArray* indexArray = g_array_new(FALSE, FALSE, sizeof(Index*));
-
-    GHashTableIter iter;
-    gpointer key, value;
-    g_hash_table_iter_init(&iter, cache);
-    while (g_hash_table_iter_next(&iter, &key, &value)) {
-        g_array_append_val(indexArray, value); 
-    }
+GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
+    GArray* indexArray = lruCacheFill(cache);
 
     int fd = open("indexs", O_RDONLY | O_CREAT,0666);
     if (fd == -1) {
@@ -257,7 +251,7 @@ GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
     while ((bytesRead = read(fd, indice, sizeof(Index))) == sizeof(Index)) {
         if (indice->pidCliente == -1) continue;
     
-        if (!g_hash_table_contains(cache, indice)) {
+        if (lruCacheContains(cache,indice)) {
             Index* copia = malloc(sizeof(Index));
             memcpy(copia, indice, sizeof(Index));
             g_array_append_val(indexArray, copia);
@@ -274,7 +268,7 @@ GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
 
 
 
-void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
+void handleInput(char **tokens, LRUCache* cache,int* order)
 {
     char diretoria[256] = "";
 
@@ -285,9 +279,8 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         (*order)++;
         Index *indice = createIndex(tokens + 1,*order);
         int pidCliente = atoi(tokens[5]);
-        if(cacheSize > (int)g_hash_table_size(cache)){   
-            insert_index_into_table(cache,indice,*order);            
-        }
+
+        lruCachePut(cache,*order,indice);
         
         writeDisco(indice);
         
@@ -304,7 +297,7 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         int pidBusca =  atoi(tokens[1]);
         sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
 
-        Index* indice = g_hash_table_lookup(cache,&pidBusca);
+        Index* indice = lruCacheGet(cache,pidBusca);
 
         if (indice == NULL){
             indice = searchDisco(pidBusca);
@@ -325,12 +318,8 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         int pidBusca =  atoi(tokens[1]);
         sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
         int notFound = -1;
-        Index* indice = g_hash_table_lookup(cache,&pidBusca);
+        lruCacheRemove(cache,pidBusca);
 
-        if (indice != NULL){
-            g_hash_table_remove(cache,&pidBusca);
-            
-        }
         notFound = removeDisco(pidBusca);
         if(notFound == 1){
             respondErrorMessage(diretoria);
@@ -344,7 +333,7 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
     {
         int pidBusca = atoi(tokens[1]);
         sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
-        Index* indice = g_hash_table_lookup(cache,&pidBusca);
+        Index* indice = lruCacheGet(cache,pidBusca);
         
         if (indice == NULL){
             indice = searchDisco(pidBusca);
@@ -397,8 +386,10 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
 
 
 int main(int argc, char *argv[]) {
-    GHashTable* cache = g_hash_table_new_full(g_int_hash, g_int_equal, free, (GDestroyNotify)freeIndex);
+    (void)argc;
+    // GHashTable* cache = g_hash_table_new_full(g_int_hash, g_int_equal, free, (GDestroyNotify)freeIndex);
     int cacheSize = atoi(argv[2]);
+    LRUCache* cacheLRU = lruCacheNew(cacheSize);
     int fd;
     int ordem = 0;
     int fdOrdem = open("ordem",O_RDWR | O_CREAT,0666);
@@ -425,7 +416,7 @@ int main(int argc, char *argv[]) {
         int nbytes = readDeadPid(zombiepid);
         
         if (nbytes > 0) {
-            Parser *parseZombies = newParser();
+            Parser *parseZombies = newParser(64);
             parseZombies = parser(parseZombies, zombiepid,' ');
             char **tokens = getTokens(parseZombies);
             int size = getNumTokens(parseZombies);
@@ -444,10 +435,10 @@ int main(int argc, char *argv[]) {
             pid_t pid;
             if ((pid = fork()) == 0) {    
      
-                Parser *parseFIFO = newParser();
+                Parser *parseFIFO = newParser(10);
                 parseFIFO = parser(parseFIFO, clientInput,' ');
                 char **tokens = getTokens(parseFIFO);
-                handleInput(tokens, cache,cacheSize,&ordem);
+                handleInput(tokens, cacheLRU,&ordem);
                 // sleep(5);
                 writeDeadPid();
                 freeParser(parseFIFO);
@@ -459,7 +450,7 @@ int main(int argc, char *argv[]) {
 
 
 
-        Parser *parseFIFO = newParser();
+        Parser *parseFIFO = newParser(10);
         parseFIFO = parser(parseFIFO, clientInput,'|');
         char **tokens = getTokens(parseFIFO);
 
@@ -471,12 +462,11 @@ int main(int argc, char *argv[]) {
             close(fd);
             break;
         }
-
-        handleInput(tokens, cache,cacheSize,&ordem);
+        handleInput(tokens, cacheLRU,&ordem);
         freeParser(parseFIFO);
         close(fd);
     }
 
-    g_hash_table_destroy(cache);
+    lruCacheFree(cacheLRU);
     return 0;
 }

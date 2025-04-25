@@ -12,12 +12,13 @@
 
 void parseBufferToIntArray(char *buffer,GArray* ret) {
 
-    Parser *parserObj = newParser();
+    Parser *parserObj = newParser(2048);
     parserObj = parser(parserObj, buffer, ' ');
     char **tokens = getTokens(parserObj);
     int size = getNumTokens(parserObj);
 
     for (int i = 0; i < size; i++) {
+        if(i >0)if(strcmp(tokens[i],"End") == 0)break;
         int val = atoi(tokens[i]);
         g_array_append_val(ret, val);
     }
@@ -31,6 +32,10 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
 {
     char *fifoPath = "tmp/matchFifo";
 
+    if (access(fifoPath, F_OK) == 0) {
+        unlink(fifoPath);
+    }
+
     if (mkfifo(fifoPath, 0666) == -1)
     {
         perror("Erro ao criar FIFO");
@@ -40,16 +45,17 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
     int total = indexArray->len;
     int chunkSize = (total + numProcesses - 1) / numProcesses;
 
+
     pid_t pids[numProcesses];  
 
     for (int p = 0; p < numProcesses; p++)
     {
-        int fifoWrite = open(fifoPath, O_RDWR);
         pid_t pid = fork();
         if (pid == 0)
         {
-            if (fifoWrite == -1)
-                exit(1);
+            int fifoWrite = open(fifoPath, O_WRONLY);
+
+            if (fifoWrite == -1) exit(1);
 
             for (int i = p * chunkSize; i < (p + 1) * chunkSize && i < total; i++)
             {
@@ -62,6 +68,7 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
                 if (grepPid == 0)
                 {
                     execl("/usr/bin/grep", "grep", "-q", "-w", match, absoluteDirectory, NULL);
+                    // close(fifoWrite);
                     _exit(1);  // Se o execl falhar
                 }
 
@@ -72,15 +79,18 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
                     char pidstr[64];
 
                     sprintf(pidstr,"%d ",getOrder(indice));
-                    int wstat =  write(fifoWrite, pidstr, strlen(pidstr));
-                    
+                    write(fifoWrite, pidstr, strlen(pidstr));
                 }
+
             }
+
+            close(fifoWrite);
 
             _exit(0);  
         }
         else if (pid > 0)
-        {
+        {   
+
             pids[p] = pid;
         }
         else
@@ -90,7 +100,9 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
         }
     }
 
-
+        int fifoRead = open(fifoPath, O_RDONLY);
+        int fifoWrite = open(fifoPath, O_WRONLY);
+        
 
         // Espera todos os filhos terminarem
         for (int p = 0; p < numProcesses; p++)
@@ -103,9 +115,8 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
             }
         }
 
- 
+        write(fifoWrite,"End ",4);
 
-        int fifoRead = open(fifoPath, O_RDWR);
         if (fifoRead == -1)
         {
             perror("Erro ao abrir FIFO para leitura");
@@ -113,12 +124,14 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
             return;
         }
     
-        char buffer[4096];
-        read(fifoRead, buffer, 4096);
+        char buffer[16384];        printf("chegou\n");
+
+        read(fifoRead, buffer, 16384);
         parseBufferToIntArray(buffer,ret);
 
     
         close(fifoRead);
+        close(fifoWrite);
 
         unlink(fifoPath);
 }

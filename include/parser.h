@@ -3,7 +3,7 @@
 
 typedef struct parser Parser;
 
-Parser *newParser();
+Parser *newParser(int numTokensMax);
 
 Parser *parser(Parser *parserE,char* line,char limitador);
 
