@@ -17,10 +17,7 @@ void getServerMessage(char **argv, int fd)
     sprintf(diretoria, "tmp/writeServerFIFO%d", mypid);
     while (1)
     {
-
-        //printf("fffff\n");
         fd = open(diretoria, O_RDONLY);
-        //printf("kkkkkkkkkk\n");
         if (fd == -1){
             close(fd);
             continue;
@@ -162,6 +159,7 @@ int main(int argc, char *argv[])
         fd = open("tmp/writeClientFIFO", O_WRONLY);
         char *indicelinhas = concatInput(argc, argv, "%s %d %s %d ", argv[1], atoi(argv[2]), argv[3], getpid());
         (void)write(fd, indicelinhas, strlen(indicelinhas));
+        free(indicelinhas);
         close(fd);
 
         break;
@@ -174,6 +172,7 @@ int main(int argc, char *argv[])
             indiceSearch = concatInput(argc, argv, "%s %s %d ", argv[1], argv[2], getpid());
         }
         (void)write(fd, indiceSearch, strlen(indiceSearch));
+        free(indiceSearch);
         close(fd);
 
         break;

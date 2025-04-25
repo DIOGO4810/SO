@@ -18,6 +18,6 @@ GArray* lruCacheFill(LRUCache* cache);
 
 int lruCacheContains (LRUCache* cache,Index* indice);
 
-
+void lruCachePrint(LRUCache* cache);
 
 #endif

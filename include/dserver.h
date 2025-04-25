@@ -8,4 +8,5 @@ int getPidCliente(Index* indice);
 int getStructSize();
 Index* getDeletedIndex();
 int getOrder(Index* indice);
+void printIndice(Index *indice);
 #endif

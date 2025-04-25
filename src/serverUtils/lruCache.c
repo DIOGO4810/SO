@@ -25,6 +25,7 @@ struct lrucache {
 
 void nodeFree(gpointer data) {
     Node* node = (Node*)data;
+    free(node->indice);
     free(node);
 }
 
@@ -42,12 +43,6 @@ LRUCache* lruCacheNew(int totalCapacity) {
 
 
 void lruCacheFree(LRUCache* cache) {
-    Node* curr = cache->head;
-    while (curr) {
-        Node* next = curr->next;
-        free(curr);
-        curr = next;
-    }
     g_hash_table_destroy(cache->table);
     free(cache);
 }
@@ -171,3 +166,21 @@ int lruCacheContains (LRUCache* cache,Index* indice){
 
 
 
+
+void lruCachePrint(LRUCache* cache) {
+    if (cache == NULL) {
+        printf("Cache não inicializada.\n");
+        return;
+    }
+
+    printf("\nCache LRU: (Total Capacity: %d, Current Size: %d)\n", cache->totalCapacity, cache->currentSize);
+    int i = 0;
+    Node* currentNode = cache->head;
+    while (i < cache->currentSize) {
+        printf("Key: %d\n", currentNode->key);
+        printIndice(currentNode->indice);
+        currentNode = currentNode->next;
+        i++;
+    }
+    printf("\n");
+}

@@ -10,8 +10,6 @@ struct parser
 {
     int fd;
 
-    char* line;
-
     char **tokens;
 
     int numtokens;
@@ -25,7 +23,6 @@ Parser *newParser(int numTokensMax)
 {
     Parser *parserE = malloc(sizeof(struct parser));
     parserE->tokens = malloc(numTokensMax * 128);    
-    parserE->line = NULL;
     parserE->numtokens = 0;
     parserE->maxNumTokens = numTokensMax;
     return parserE;
@@ -34,29 +31,21 @@ Parser *newParser(int numTokensMax)
 Parser *parser(Parser *parserE, char *line, char limitador) {
     if (!parserE || !line) return NULL;
 
-    // Guardar a linha original
-    parserE->line = line;
-
-    // Criar uma cópia da linha porque strsep modifica a string
-    char *lineCopy = strdup(line);
-    if (!lineCopy) return NULL;
 
     // Construir o string de delimitador
     char delimStr[2] = { limitador, '\0' };
 
     int i = 0;
-    char *token = strsep(&lineCopy, delimStr);
+    char *token = strsep(&line, delimStr);
     while (token != NULL && i < parserE->maxNumTokens) {
         parserE->tokens[i++] = token;
-        token = strsep(&lineCopy, delimStr);
+        token = strsep(&line, delimStr);
     }
 
     parserE->numtokens = i;
-
     return parserE;
 }
 
-// Função que dá free da memoria para a estrutura e os campos do Parser
 void freeParser(Parser *parserE)
 {
     free(parserE->tokens);

@@ -12,6 +12,9 @@
 #include "serverUtils.h"
 #include "lruCache.h"
 
+#define ZOMBIESFIFOPATH "tmp/killzombies"
+#define CACHECONNECTPATH "tmp/cacheConnect"
+
 struct index
 {
     char title[250];
@@ -76,9 +79,9 @@ Index* getDeletedIndex() {
     Index* deleted = malloc(sizeof(Index));
     if (!deleted) return NULL; 
 
-    strcpy(deleted->title, "");
-    strcpy(deleted->author, "");
-    strcpy(deleted->path, "");
+    strcpy(deleted->title, "\0");
+    strcpy(deleted->author, "\0");
+    strcpy(deleted->path, "\0");
     deleted->year = 0;
     deleted->order = -1;
     deleted->pidCliente = -1;
@@ -102,6 +105,7 @@ void freeEstrutura(GArray *estrutura)
 
 void printIndice(Index *indice)
 {
+    if(indice == NULL)printf("Indice é Nulo");
     printf(" Title: %s | Author: %s | Year: %d | Path: %s | PidCliente: %d\n",
            indice->title, indice->author, indice->year, indice->path,indice->pidCliente);
 }
@@ -152,6 +156,7 @@ void respondErrorMessage(char *diretoria)
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "404");
     write(fdmessage, message, strlen(message));
+
     free(message);
     close(fdmessage);
 }
@@ -174,30 +179,6 @@ int checkAsync(char *input)
         return 0;
     return 1 ;
 }
-
-void writeDeadPid(){
-    char pidstr[10];
-    sprintf(pidstr, "%d ", getpid());
-    int fdWR = open("tmp/killzombies",O_RDWR);
-    int fdW = open("tmp/killzombies",O_WRONLY);
-    write(fdW, pidstr, strlen(pidstr));
-    close(fdWR);
-    close(fdW);
-
-}
-
-
-int readDeadPid(char* zombiepid){
-    int fdWR = open("tmp/killzombies",O_RDWR);
-    int fdW = open("tmp/killzombies",O_WRONLY);
-    int fdR = open("tmp/killzombies",O_RDONLY);
-    close(fdW);
-    close(fdWR);
-    int nbytes = read(fdR, zombiepid, 256);
-    close(fdR);
-    return nbytes;
-}
-
 
 
 
@@ -268,126 +249,151 @@ GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
 
 
 
-void handleInput(char **tokens, LRUCache* cache,int* order)
+void handleInputSync(char **tokens, LRUCache* cache, int* order)
 {
     char diretoria[256] = "";
 
     switch (tokens[0][1])
     {
-    case 'a':
+    case 'a':  // Adicionar
     {
         (*order)++;
-        Index *indice = createIndex(tokens + 1,*order);
+        Index *indice = createIndex(tokens + 1, *order);
         int pidCliente = atoi(tokens[5]);
 
-        lruCachePut(cache,*order,indice);
-        
+        lruCachePut(cache, *order, indice);
         writeDisco(indice);
-        
-        sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
-        respondMessageAdiciona(diretoria,*order);
-        
 
+        sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
+        respondMessageAdiciona(diretoria, *order);
+        break;
     }
-    break;
 
-    case 'c':
+    case 'd':  // Remover
     {
         int pidCliente = atoi(tokens[2]);
-        int pidBusca =  atoi(tokens[1]);
-        sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
+        int pidBusca = atoi(tokens[1]);
 
-        Index* indice = lruCacheGet(cache,pidBusca);
+        sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
+        lruCacheRemove(cache, pidBusca);
 
-        if (indice == NULL){
-            indice = searchDisco(pidBusca);
-            if(indice == NULL){
-                respondErrorMessage(diretoria);
-                break;
-            }
-            
-        }
-        respondMessageConsulta(diretoria,indice);
-
-    }
-    break;
-
-    case 'd':
-    {
-        int pidCliente = atoi(tokens[2]);
-        int pidBusca =  atoi(tokens[1]);
-        sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
-        int notFound = -1;
-        lruCacheRemove(cache,pidBusca);
-
-        notFound = removeDisco(pidBusca);
-        if(notFound == 1){
+        if (removeDisco(pidBusca) == 1) {
             respondErrorMessage(diretoria);
             break;
         }
-        respondMessageRemove(diretoria,pidBusca);
 
-    }
-    break;
-    case 'l':
-    {
-        int pidBusca = atoi(tokens[1]);
-        sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
-        Index* indice = lruCacheGet(cache,pidBusca);
-        
-        if (indice == NULL){
-            indice = searchDisco(pidBusca);
-            if(indice == NULL){
-                respondErrorMessage(diretoria);
-                break;
-            }
-
-        }
-
-        char absoluteDirectory[256] = "";
-        sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
-        pid_t pid;
-        mkfifo(diretoria, 0666);
-        if ((pid = fork()) == 0)
-        {
-            int fdmessage = open(diretoria, O_WRONLY);
-            dup2(fdmessage, 1);
-            close(fdmessage);
-            execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
-            exit(1);
-        }
-    }
-    break;
-
-    case 's':
-    {
-        GArray *ret = g_array_new(FALSE, FALSE, sizeof(int));
-        GArray* indexArray = getIndexsFromCacheAndDisc(cache);
-        if(tokens[2][0] == 'n'){
-            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
-            findIndexsMatchParallel(ret,tokens[1],indexArray,atoi(tokens[2]+1));
-        }else{
-            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
-            findIndexsMatch(ret,tokens[1],indexArray);
-        }
-
-        writeGArrayToFIFO(ret,diretoria);
-
-        g_array_free(ret,TRUE);
-        freeEstrutura(indexArray);
+        respondMessageRemove(diretoria, pidBusca);
         break;
     }
+
     default:
         break;
     }
 }
+
+Index* handleInputAsync(char **tokens, LRUCache* cache)
+{
+    char diretoria[256] = "";
+
+    switch (tokens[0][1])
+    {
+        case 'c':  // Consultar
+        {
+            int pidCliente = atoi(tokens[2]);
+            int pidBusca = atoi(tokens[1]);
+            sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
+        
+            Index* indice = lruCacheGet(cache, pidBusca);
+        
+            if (indice == NULL) {
+                indice = searchDisco(pidBusca);
+                if (indice == NULL) {
+                    respondErrorMessage(diretoria);
+                    return NULL;
+                }
+                respondMessageConsulta(diretoria, indice);
+                return indice;  
+            }
+        
+            respondMessageConsulta(diretoria, indice);
+            return NULL;
+        }
+        
+
+        case 'l': 
+        {
+            int pidBusca = atoi(tokens[1]);
+            int pidCliente = atoi(tokens[3]);
+            sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
+            mkfifo(diretoria, 0666);
+            char absoluteDirectory[256];
+        
+            Index* indice = lruCacheGet(cache, pidBusca);
+        
+            if (indice == NULL) {
+                indice = searchDisco(pidBusca);
+                if (indice == NULL) {
+                    respondErrorMessage(diretoria);
+                    return NULL;
+                }
+        
+                sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
+
+                if (fork() == 0) {
+                    int fdmessage = open(diretoria, O_WRONLY);
+                    dup2(fdmessage, 1);
+                    close(fdmessage);
+                    execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
+                    exit(1);
+                }
+        
+                return indice;
+            }
+        
+            sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
+        
+            if (fork() == 0) {
+                int fdmessage = open(diretoria, O_WRONLY);
+                dup2(fdmessage, 1);
+                close(fdmessage);
+                execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
+                exit(1);
+            }
+        
+            return NULL;
+        }
+
+    case 's':  
+    {
+        GArray *ret = g_array_new(FALSE, FALSE, sizeof(int));
+        GArray* indexArray = getIndexsFromCacheAndDisc(cache);
+
+        if (tokens[2][0] == 'n') {
+            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
+            findIndexsMatchParallel(ret, tokens[1], indexArray, atoi(tokens[2] + 1));
+        } else {
+            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
+            findIndexsMatch(ret, tokens[1], indexArray);
+        }
+
+        writeGArrayToFIFO(ret, diretoria);
+        g_array_free(ret, TRUE);
+        freeEstrutura(indexArray);
+        return NULL;
+    }
+
+    default:
+        break;
+    }
+    return NULL;
+}
+
 
 
 
 
 int main(int argc, char *argv[]) {
     (void)argc;
-    // GHashTable* cache = g_hash_table_new_full(g_int_hash, g_int_equal, free, (GDestroyNotify)freeIndex);
     int cacheSize = atoi(argv[2]);
     LRUCache* cacheLRU = lruCacheNew(cacheSize);
     int fd;
@@ -396,8 +402,24 @@ int main(int argc, char *argv[]) {
     read(fdOrdem,&ordem,sizeof(int));
     close(fdOrdem);
     int status;
+    int fdRDdummyCache;
+    int fdRDdummyZombies;
 
-    mkfifo("tmp/killzombies",0666);
+    mkfifo(ZOMBIESFIFOPATH,0666);
+    mkfifo(CACHECONNECTPATH,0666);
+
+    pid_t pid;
+    if ((pid = fork()) == 0) {    
+        int fdWriteZ = open(CACHECONNECTPATH,O_WRONLY);
+        close(fdWriteZ);
+        int fdWriteC = open(ZOMBIESFIFOPATH,O_WRONLY);
+        close(fdWriteC);
+        
+        exit(0);
+    } else {
+        fdRDdummyCache = open(CACHECONNECTPATH,O_RDONLY);
+        fdRDdummyZombies = open(ZOMBIESFIFOPATH,O_RDONLY);
+    }
 
     while (1) {
         fd = open("tmp/writeClientFIFO", O_RDONLY);
@@ -409,13 +431,15 @@ int main(int argc, char *argv[]) {
 
         char clientInput[1024] = "";
         char zombiepid[256] = "";
+        Index* cacheConnect = malloc(sizeof(Index));
 
         read(fd, clientInput, 1024);
         printf("O cliente mandou isto:%s\n", clientInput);
         
-        int nbytes = readDeadPid(zombiepid);
+        int nbytesZombies = read(fdRDdummyZombies,zombiepid,256);
+        int nbytesCache = read(fdRDdummyCache,cacheConnect,sizeof(Index));
         
-        if (nbytes > 0) {
+        if (nbytesZombies > 0) {
             Parser *parseZombies = newParser(64);
             parseZombies = parser(parseZombies, zombiepid,' ');
             char **tokens = getTokens(parseZombies);
@@ -425,7 +449,12 @@ int main(int argc, char *argv[]) {
                 int morto = waitpid(atoi(tokens[i]), &status, 0);                  
                 printf("Processo zombie morto:%d\n",morto);
             }
+            freeParser(parseZombies);
             
+        }
+
+        if(nbytesCache > 0){
+            lruCachePut(cacheLRU,cacheConnect->order,cacheConnect);
         }
 
         
@@ -434,13 +463,22 @@ int main(int argc, char *argv[]) {
         if (isAsync) {
             pid_t pid;
             if ((pid = fork()) == 0) {    
-     
                 Parser *parseFIFO = newParser(10);
                 parseFIFO = parser(parseFIFO, clientInput,' ');
                 char **tokens = getTokens(parseFIFO);
-                handleInput(tokens, cacheLRU,&ordem);
-                // sleep(5);
-                writeDeadPid();
+                Index* updateCache = handleInputAsync(tokens, cacheLRU);
+                //sleep(5);
+                char pidstr[16];
+                sprintf(pidstr, "%d ", getpid());
+                int fdWRZ = open(ZOMBIESFIFOPATH,O_WRONLY);
+                write(fdWRZ,pidstr,strlen(pidstr));
+                close(fdWRZ);
+                if(updateCache != NULL){
+                    int fdWRC = open(CACHECONNECTPATH,O_WRONLY);
+                    write(fdWRC,updateCache,sizeof(Index));
+                    close(fdWRC);
+                    free(updateCache);
+                }
                 freeParser(parseFIFO);
                 exit(0);
             } else {
@@ -460,13 +498,17 @@ int main(int argc, char *argv[]) {
             write(fdOrdem,&ordem,sizeof(int));
             close(fdOrdem);
             close(fd);
+            close(fdRDdummyCache);
+            close(fdRDdummyZombies);
+            lruCachePrint(cacheLRU);
             break;
         }
-        handleInput(tokens, cacheLRU,&ordem);
+        handleInputSync(tokens, cacheLRU,&ordem);
         freeParser(parseFIFO);
         close(fd);
     }
-
+    close(fdRDdummyCache);
+    close(fdRDdummyZombies);
     lruCacheFree(cacheLRU);
     return 0;
 }

@@ -62,7 +62,9 @@ void findIndexsMatchParallel(GArray *ret, char *match, GArray *indexArray, int n
                 Index *indice = g_array_index(indexArray, Index *, i);
 
                 char absoluteDirectory[256];
-                snprintf(absoluteDirectory, sizeof(absoluteDirectory), "Gdataset/%s", getPath(indice));
+                char* path = getPath(indice);
+                snprintf(absoluteDirectory, sizeof(absoluteDirectory), "Gdataset/%s", path);
+                free(path);
 
                 pid_t grepPid = fork();
                 if (grepPid == 0)

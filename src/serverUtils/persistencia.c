@@ -42,7 +42,7 @@ Index* searchDisco(int ordem) {
         close(fd);
         return NULL;
     }
-
+    
     close(fd);
     return indice;
 }
