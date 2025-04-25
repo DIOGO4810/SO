@@ -5,7 +5,9 @@
         "array": "c",
         "signal.h": "c",
         "unistd.h": "c",
-        "dserver.h": "c"
+        "dserver.h": "c",
+        "stat.h": "c",
+        "vector": "c"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

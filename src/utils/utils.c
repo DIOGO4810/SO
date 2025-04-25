@@ -56,10 +56,9 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
         return;
     }
 
-    char buffer[1024] = "[";
-    char temp[32];
-
+    char buffer[16384] = "[";
     for (guint i = 0; i < array->len; i++) {
+        char temp[32] = "";
         snprintf(temp, sizeof(temp), "%d", g_array_index(array, int, i));
         strcat(buffer, temp);
         if (i < array->len - 1) strcat(buffer, ",");
@@ -70,6 +69,10 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
     
     close(fd);
 }
+
+
+
+
 
 
 void printGArray(GArray *array)
@@ -118,3 +121,13 @@ int validaInput(char** argv) {
 
     return 1;
 }
+
+
+
+
+
+
+
+
+
+

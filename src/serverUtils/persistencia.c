@@ -8,7 +8,7 @@
 void writeDisco(Index* indice) {
     int fd = open("indexs", O_WRONLY | O_APPEND | O_CREAT, 0666);
     if (fd == -1) {
-        perror("Erro ao abrir o ficheiro");
+        perror("Erro ao abrir o ficheiro no write");
         return;
     }
 
@@ -23,7 +23,8 @@ void writeDisco(Index* indice) {
 Index* searchDisco(int ordem) {
     int fd = open("indexs", O_RDONLY);
     if (fd == -1) {
-        perror("Erro ao abrir ficheiro");
+        perror("Erro ao abrir ficheiro no search");
+        close(fd);
         return NULL;
     }
 
@@ -37,7 +38,8 @@ Index* searchDisco(int ordem) {
     lseek(fd,(ordem-1)*getStructSize(),SEEK_SET);
     int bytesRead = read(fd,indice,getStructSize());
     if(bytesRead == 0 || getPidCliente(indice) == -1){
-        free(indice);  
+        free(indice); 
+        close(fd);
         return NULL;
     }
 
@@ -51,15 +53,16 @@ Index* searchDisco(int ordem) {
 int removeDisco(int ordem) {
     int fd = open("indexs", O_RDWR);
     if (fd == -1) {
-        perror("Erro ao abrir o ficheiro");
-        return -1;
+        perror("Erro ao abrir o ficheiro no remove");
+        close(fd);
+        return 1;
     }
 
     Index* indice = malloc(getStructSize());
     if (!indice) {
         perror("Erro de alocação");
         close(fd);
-        return -1;
+        return 1;
     }
 
     off_t offset = (ordem - 1) * getStructSize();
@@ -71,7 +74,12 @@ int removeDisco(int ordem) {
         close(fd);
         return 1;  // Linha não existe
     }
-
+    
+    if(getOrder(indice) == -1){
+        free(indice);
+        close(fd);
+        return 1;  // Indice está eliminado
+    }
     // Substituir por uma struct marcada como deletada
     Index* deleted = getDeletedIndex();
     lseek(fd, offset, SEEK_SET);

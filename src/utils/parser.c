@@ -23,31 +23,34 @@ struct parser
 Parser *newParser()
 {
     Parser *parserE = malloc(sizeof(struct parser));
-    parserE->tokens = malloc(MaxTokensSize * sizeof(char *));    
+    parserE->tokens = malloc(MaxTokensSize * 200);    
     parserE->line = NULL;
     parserE->numtokens = 0;
     return parserE;
 }
 
-Parser *parser(Parser *parserE,char* line,char limitador)
-{
+Parser *parser(Parser *parserE, char *line, char limitador) {
+    if (!parserE || !line) return NULL;
 
-
+    // Guardar a linha original
     parserE->line = line;
 
-    char *lineCopy = line;
+    // Criar uma cópia da linha porque strsep modifica a string
+    char *lineCopy = strdup(line);
+    if (!lineCopy) return NULL;
+
+    // Construir o string de delimitador
+    char delimStr[2] = { limitador, '\0' };
 
     int i = 0;
-
-    // Divide a linha em tokens usando strsep
-    char *token = strsep(&lineCopy, &limitador);
-    while (token != NULL && i < MaxTokensSize)
-    {
-        // Armazenar o token no array
+    char *token = strsep(&lineCopy, delimStr);
+    while (token != NULL && i < MaxTokensSize) {
         parserE->tokens[i++] = token;
-        token = strsep(&lineCopy, &limitador);
+        token = strsep(&lineCopy, delimStr);
     }
-    parserE->numtokens = i-1;
+
+    parserE->numtokens = i;
+
     return parserE;
 }
 
@@ -68,5 +71,18 @@ char** getTokens(Parser * parserE)
 
 
 int getNumTokens(Parser * parserE){
-    return parserE->numtokens;
+    return parserE->numtokens-1;
+}
+
+void printTokens(char **tokens) {
+    if (tokens == NULL) {
+        printf("Lista de tokens é NULL.\n");
+        return;
+    }
+
+    int i = 0;
+    while (tokens[i] != NULL ) {
+        printf("Token %d: %s\n", i, tokens[i]);
+        i++;
+    }
 }

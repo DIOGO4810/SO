@@ -18,12 +18,16 @@ void getServerMessage(char **argv, int fd)
     while (1)
     {
 
+        //printf("fffff\n");
         fd = open(diretoria, O_RDONLY);
-        if (fd == -1)
+        //printf("kkkkkkkkkk\n");
+        if (fd == -1){
+            close(fd);
             continue;
+        }
 
         char command = argv[1][1];
-
+       
         switch (command)
         {
         case 'a':
@@ -32,6 +36,8 @@ void getServerMessage(char **argv, int fd)
             (void)read(fd, serverOutput, 256);
 
             write(1, serverOutput, strlen(serverOutput)); 
+            close(fd);
+            unlink(diretoria);
             break;
         }
 
@@ -39,23 +45,25 @@ void getServerMessage(char **argv, int fd)
         {
             char serverOutput[512] = "";
             (void)read(fd, serverOutput, 512);
-            Parser *parseFIFO = newParser();
-            parseFIFO = parser(parseFIFO, serverOutput, ' ');
-            char **tokens = getTokens(parseFIFO);
             
-
-            if (atoi(tokens[0]) == 404)
+            if (atoi(serverOutput) == 404)
             {
                 write(1, "Index não existente\n", 21); 
-                freeParser(parseFIFO);
+                close(fd);
+                unlink(diretoria);
                 break;
             }
+
+            Parser *parseFIFO = newParser();
+            parseFIFO = parser(parseFIFO, serverOutput, '|');
+            char **tokens = getTokens(parseFIFO);
             
             char output[512];
-            snprintf(output, sizeof(output), "Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",
-            tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
+            snprintf(output, sizeof(output), "Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
             write(1, output, strlen(output)); 
 
+            close(fd);
+            unlink(diretoria);
             freeParser(parseFIFO);
             break;
         }
@@ -67,9 +75,13 @@ void getServerMessage(char **argv, int fd)
             if (atoi(serverOutput) == 404)
             {
                 write(1, "Index não existente\n", 21); 
+                close(fd);
+                unlink(diretoria);
                 break;
             }
             write(1, serverOutput, strlen(serverOutput)); 
+            close(fd);
+            unlink(diretoria);
             break;
         }
 
@@ -80,21 +92,28 @@ void getServerMessage(char **argv, int fd)
             if (atoi(serverOutput) == 404)
             {
                 write(1, "Index não existente\n", 21); 
+                close(fd);
+                unlink(diretoria);
                 break;
             }
             write(1, serverOutput, strlen(serverOutput)); 
+            close(fd);
+            unlink(diretoria);
             break;
         }
 
         case 's':
         {
-            char serverOutput[1024] = "";
-            (void)read(fd, serverOutput, 1024);
+            char serverOutput[16384] = "";
+            (void)read(fd, serverOutput, 16384);
             write(1, serverOutput, strlen(serverOutput)); 
+            close(fd);
+            unlink(diretoria);
             break;
         }
         default:
             printf("Comando inválido\n");
+            close(fd);
             break;
         }
         break;
@@ -111,7 +130,7 @@ int main(int argc, char *argv[])
     case 'a':
         if(!validaInput(argv))return 0;
         fd = open("tmp/writeClientFIFO", O_WRONLY);
-        char *metaDados = concatInput(argc, argv, "%s %s %s %s %s %d ", argv[1], argv[2], argv[3], argv[4], argv[5], getpid());
+        char *metaDados = concatInput(argc, argv, "%s|%s|%s|%s|%s|%d", argv[1], argv[2], argv[3], argv[4], argv[5], getpid());
         (void)write(fd, metaDados, strlen(metaDados));
         free(metaDados);
         close(fd);
@@ -127,7 +146,7 @@ int main(int argc, char *argv[])
 
     case 'd':
         fd = open("tmp/writeClientFIFO", O_WRONLY);
-        char *indiceRemove = concatInput(argc, argv, "%s %d %d ", argv[1], atoi(argv[2]), getpid());
+        char *indiceRemove = concatInput(argc, argv, "%s|%d|%d", argv[1], atoi(argv[2]), getpid());
         (void)write(fd, indiceRemove, strlen(indiceRemove));
         free(indiceRemove);
         close(fd);

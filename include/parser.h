@@ -11,6 +11,9 @@ void freeParser(Parser *parserE);
 
 char** getTokens(Parser * parserE);
 
+void printTokens(char **tokens);
+
+
 int getNumTokens(Parser * parserE);
 
 #endif 

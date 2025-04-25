@@ -127,9 +127,10 @@ void respondMessageAdiciona(char *diretoria, int indice)
     int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "Document %d indexed\n", indice);
+
     (void)write(fdmessage, message, strlen(message));
-    close(fdmessage);
     free(message);
+    close(fdmessage);
 }
 
 void respondMessageConsulta(char *diretoria, Index *indice)
@@ -137,21 +138,21 @@ void respondMessageConsulta(char *diretoria, Index *indice)
     mkfifo(diretoria, 0666);
     int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(512 * sizeof(char));
-    sprintf(message, "%s %s %d %s", indice->title, indice->author, indice->year, indice->path);
+    sprintf(message, "%s|%s|%d|%s", indice->title, indice->author, indice->year, indice->path);
     (void)write(fdmessage, message, strlen(message));
-    close(fdmessage);
     free(message);
+    close(fdmessage);
 }
 
 void respondErrorMessage(char *diretoria)
 {
-    mkfifo(diretoria, 0666);
+    int error = mkfifo(diretoria, 0666);
     int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "404");
-    (void)write(fdmessage, message, strlen(message));
-    close(fdmessage);
+    write(fdmessage, message, strlen(message));
     free(message);
+    close(fdmessage);
 }
 
 void respondMessageRemove(char *diretoria, int indice)
@@ -161,8 +162,8 @@ void respondMessageRemove(char *diretoria, int indice)
     char *message = malloc(256 * sizeof(char));
     sprintf(message, "Index entry %d deleted\n", indice);
     (void)write(fdmessage, message, strlen(message));
-    close(fdmessage);
     free(message);
+    close(fdmessage);
 
 }
 
@@ -192,7 +193,7 @@ int readDeadPid(char* zombiepid){
     close(fdW);
     close(fdWR);
     int nbytes = read(fdR, zombiepid, 256);
-
+    close(fdR);
     return nbytes;
 }
 
@@ -224,11 +225,12 @@ void findIndexsMatch(GArray* ret, char* match,GArray* indexArray){
                 int exit_status = WEXITSTATUS(status);
                 if (exit_status == 0)
                 {
-                    g_array_append_val(ret,indice->order );
+                    g_array_append_val(ret,indice->order);
                 }
             }
         }
     }
+
     
 }
 
@@ -238,15 +240,16 @@ GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
     GArray* indexArray = g_array_new(FALSE, FALSE, sizeof(Index*));
 
     GHashTableIter iter;
-    gpointer key;
+    gpointer key, value;
     g_hash_table_iter_init(&iter, cache);
-    while (g_hash_table_iter_next(&iter, &key, NULL)) {
-        g_array_append_val(indexArray, key); 
+    while (g_hash_table_iter_next(&iter, &key, &value)) {
+        g_array_append_val(indexArray, value); 
     }
 
     int fd = open("indexs", O_RDONLY | O_CREAT,0666);
     if (fd == -1) {
-        perror("Erro ao abrir indexs.csv");
+        perror("Erro ao abrir indexs");
+        close(fd);
         return indexArray;
     }
     Index* indice = malloc(sizeof(Index));
@@ -261,8 +264,8 @@ GArray* getIndexsFromCacheAndDisc(GHashTable* cache) {
         }
     }
     free(indice);
+    close(fd);
   
-
     return indexArray;
 }
 
@@ -285,10 +288,9 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         if(cacheSize > (int)g_hash_table_size(cache)){   
             insert_index_into_table(cache,indice,*order);            
         }
-
-
+        
         writeDisco(indice);
-
+        
         sprintf(diretoria, "tmp/writeServerFIFO%d",pidCliente);
         respondMessageAdiciona(diretoria,*order);
         
@@ -308,6 +310,7 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
             indice = searchDisco(pidBusca);
             if(indice == NULL){
                 respondErrorMessage(diretoria);
+                break;
             }
             
         }
@@ -380,6 +383,7 @@ void handleInput(char **tokens, GHashTable* cache, int cacheSize,int* order)
         }
 
         writeGArrayToFIFO(ret,diretoria);
+
         g_array_free(ret,TRUE);
         freeEstrutura(indexArray);
         break;
@@ -408,6 +412,7 @@ int main(int argc, char *argv[]) {
         fd = open("tmp/writeClientFIFO", O_RDONLY);
         
         if (fd == -1) {
+            close(fd);
             continue;
         }
 
@@ -455,22 +460,23 @@ int main(int argc, char *argv[]) {
 
 
         Parser *parseFIFO = newParser();
-        parseFIFO = parser(parseFIFO, clientInput,' ');
+        parseFIFO = parser(parseFIFO, clientInput,'|');
         char **tokens = getTokens(parseFIFO);
 
         if (tokens[0][1] == 'f') {
             freeParser(parseFIFO);
             int fdOrdem = open("ordem",O_RDWR | O_CREAT,0666);
             write(fdOrdem,&ordem,sizeof(int));
+            close(fdOrdem);
             close(fd);
             break;
         }
 
         handleInput(tokens, cache,cacheSize,&ordem);
         freeParser(parseFIFO);
+        close(fd);
     }
 
-    close(fd);
     g_hash_table_destroy(cache);
     return 0;
 }
