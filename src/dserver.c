@@ -398,7 +398,7 @@ int main(int argc, char *argv[]) {
     LRUCache* cacheLRU = lruCacheNew(cacheSize);
     int fd;
     int ordem = 0;
-    int fdOrdem = open("ordem",O_RDWR | O_CREAT,0666);
+    int fdOrdem = open("ordem",O_RDONLY | O_CREAT,0666);
     read(fdOrdem,&ordem,sizeof(int));
     close(fdOrdem);
     int status;
@@ -494,7 +494,7 @@ int main(int argc, char *argv[]) {
 
         if (tokens[0][1] == 'f') {
             freeParser(parseFIFO);
-            int fdOrdem = open("ordem",O_RDWR | O_CREAT,0666);
+            int fdOrdem = open("ordem",O_WRONLY | O_CREAT,0666);
             write(fdOrdem,&ordem,sizeof(int));
             close(fdOrdem);
             close(fd);

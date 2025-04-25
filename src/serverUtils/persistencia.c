@@ -51,43 +51,44 @@ Index* searchDisco(int ordem) {
 
 
 int removeDisco(int ordem) {
-    int fd = open("indexs", O_RDWR);
-    if (fd == -1) {
-        perror("Erro ao abrir o ficheiro no remove");
-        close(fd);
-        return 1;
-    }
+    int fdW = open("indexs", O_WRONLY);
+    int fdR = open("indexs", O_RDONLY);
+
 
     Index* indice = malloc(getStructSize());
     if (!indice) {
         perror("Erro de alocação");
-        close(fd);
+        close(fdW);
+        close(fdR);
         return 1;
     }
 
     off_t offset = (ordem - 1) * getStructSize();
-    lseek(fd, offset, SEEK_SET);
+    lseek(fdR, offset, SEEK_SET);
 
-    int bytesRead = read(fd, indice, getStructSize());
+    int bytesRead = read(fdR, indice, getStructSize());
     if (bytesRead <= 0) {
         free(indice);
-        close(fd);
+        close(fdW);
+        close(fdR);
         return 1;  // Linha não existe
     }
     
     if(getOrder(indice) == -1){
         free(indice);
-        close(fd);
+        close(fdW);
+        close(fdR);
         return 1;  // Indice está eliminado
     }
     // Substituir por uma struct marcada como deletada
     Index* deleted = getDeletedIndex();
-    lseek(fd, offset, SEEK_SET);
-    write(fd, deleted, getStructSize());
+    lseek(fdW, offset, SEEK_SET);
+    write(fdW, deleted, getStructSize());
 
     free(indice);
     free(deleted);
-    close(fd);
+    close(fdW);
+    close(fdR);
 
     return 0;
 }
