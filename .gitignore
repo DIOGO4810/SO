@@ -5,4 +5,6 @@ bin/dserver
 obj/*.o
 obj/utils/*.o
 
-indexs.csv
+indexs
+
+ordem
