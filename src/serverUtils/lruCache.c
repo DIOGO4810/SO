@@ -6,6 +6,7 @@
 #include <glib.h>
 #include "dserver.h"
 #include "lruCache.h"
+#include "utils.h"
 
 
 typedef struct Node {
@@ -128,8 +129,7 @@ void lruCachePut(LRUCache* cache, int key, Index* indice) {
 Index* lruCacheGet(LRUCache* cache, int key) {
     Node* node = g_hash_table_lookup(cache->table, GINT_TO_POINTER(key));
     if (!node) return NULL;
-
-    moveToHead(cache, node);
+    // moveToHead(cache, node); Inutil já que as consultas apenas acontecem nos forks
     return node->indice;
 }
 
@@ -154,14 +154,15 @@ GArray* lruCacheFill(LRUCache* cache){
         Node* node = (Node*)value;
         g_array_append_val(indexArray, node->indice);
     }
+
     return indexArray;
 }
 
-int lruCacheContains (LRUCache* cache,Index* indice){
-
-    return !g_hash_table_contains(cache->table, indice);
-
+int lruCacheContains(LRUCache* cache, Index* indice) {
+    void* found = g_hash_table_lookup(cache->table, GINT_TO_POINTER(getOrder(indice)));
+    return found != NULL;
 }
+
 
 
 
@@ -184,3 +185,13 @@ void lruCachePrint(LRUCache* cache) {
     }
     printf("\n");
 }
+
+
+
+
+
+
+
+
+
+

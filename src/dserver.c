@@ -48,10 +48,7 @@ Index *createIndex(char **tokens,int order)
     return indice;
 }
 
-void freeIndex(Index *indice)
-{
-    free(indice);
-}
+
 
 void insert_index_into_table(GHashTable* cache,Index* indice ,int id) {
     int* key = malloc(sizeof(int));  // Aloca memória para a chave
@@ -61,6 +58,18 @@ void insert_index_into_table(GHashTable* cache,Index* indice ,int id) {
 
 char* getPath(Index* indice){
     return strdup(indice->path);
+}
+
+char* getTitle(Index* indice){
+    return strdup(indice->title);
+}
+
+char* getAuthor(Index* indice){
+    return strdup(indice->author);
+}
+
+int getYear (Index* indice){
+    return indice->year;
 }
 
 int getPidCliente(Index* indice){
@@ -98,7 +107,7 @@ void freeEstrutura(GArray *estrutura)
         if (g_array_index(estrutura, Index *, i) == NULL)
             continue;
         Index *item = g_array_index(estrutura, Index *, i);
-        freeIndex(item);
+        free(item);
     }
     g_array_free(estrutura, TRUE);
 }
@@ -111,138 +120,20 @@ void printIndice(Index *indice)
 }
 
 
+void spawnGrepCount( char *datasetDirectory,  char *diretoria, char *match, Index *indice) {
+    char absoluteDirectory[256];
+    sprintf(absoluteDirectory, "%s/%s", datasetDirectory, indice->path);
 
-void printGArrayIndex(GArray *array)
-{
-    int numeroValidos = 0;
-    for (guint i = 0; i < array->len; i++)
-    {
-        if (g_array_index(array, Index *, i) == NULL)
-            continue;
-        numeroValidos++;
-        Index *item = g_array_index(array, Index *, i);
-        printIndice(item);
+    if (fork() == 0) {
+        int fdmessage = open(diretoria, O_WRONLY);
+        dup2(fdmessage, 1);
+        close(fdmessage);
+        execl("/usr/bin/grep", "grep", "-c", "-w", match, absoluteDirectory, NULL);
+        exit(1);
     }
-    printf("GArray contém %d elementos\n", numeroValidos);
-}
-
-void respondMessageAdiciona(char *diretoria, int indice)
-{
-    mkfifo(diretoria, 0666);
-    int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Document %d indexed\n", indice);
-
-    (void)write(fdmessage, message, strlen(message));
-    free(message);
-    close(fdmessage);
-}
-
-void respondMessageConsulta(char *diretoria, Index *indice)
-{
-    mkfifo(diretoria, 0666);
-    int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(512 * sizeof(char));
-    sprintf(message, "%s|%s|%d|%s", indice->title, indice->author, indice->year, indice->path);
-    (void)write(fdmessage, message, strlen(message));
-    free(message);
-    close(fdmessage);
-}
-
-void respondErrorMessage(char *diretoria)
-{
-    mkfifo(diretoria, 0666);
-    int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(256 * sizeof(char));
-    sprintf(message, "404");
-    write(fdmessage, message, strlen(message));
-
-    free(message);
-    close(fdmessage);
-}
-
-void respondMessageRemove(char *diretoria, int indice)
-{
-    mkfifo(diretoria, 0666);
-    int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Index entry %d deleted\n", indice);
-    (void)write(fdmessage, message, strlen(message));
-    free(message);
-    close(fdmessage);
-
-}
-
-int checkAsync(char *input)
-{
-    if (input[1] == 'a' || input[1] == 'd' || input[1] == 'f')
-        return 0;
-    return 1 ;
 }
 
 
-
-
-void findIndexsMatch(GArray* ret, char* match,GArray* indexArray){
-    for (guint i = 0; i < indexArray->len; i++)
-    {
-        if (g_array_index(indexArray, Index *, i) == NULL)
-            continue;
-        Index *indice = g_array_index(indexArray, Index *, i);
-        char absoluteDirectory[256] = "";
-        sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
-        pid_t pid;
-        if ((pid = fork()) == 0)
-        {
-            execl("/usr/bin/grep", "grep", "-q", "-w", match, absoluteDirectory, NULL);
-            exit(0);
-        }
-        else
-        {
-            int status;
-            waitpid(pid, &status, 0);//Sincronizador do código assincrono
-
-            if (WIFEXITED(status))
-            {
-                int exit_status = WEXITSTATUS(status);
-                if (exit_status == 0)
-                {
-                    g_array_append_val(ret,indice->order);
-                }
-            }
-        }
-    }
-
-    
-}
-
-
-
-GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
-    GArray* indexArray = lruCacheFill(cache);
-
-    int fd = open("indexs", O_RDONLY | O_CREAT,0666);
-    if (fd == -1) {
-        perror("Erro ao abrir indexs");
-        close(fd);
-        return indexArray;
-    }
-    Index* indice = malloc(sizeof(Index));
-    ssize_t bytesRead;
-    while ((bytesRead = read(fd, indice, sizeof(Index))) == sizeof(Index)) {
-        if (indice->pidCliente == -1) continue;
-    
-        if (lruCacheContains(cache,indice)) {
-            Index* copia = malloc(sizeof(Index));
-            memcpy(copia, indice, sizeof(Index));
-            g_array_append_val(indexArray, copia);
-        }
-    }
-    free(indice);
-    close(fd);
-  
-    return indexArray;
-}
 
 
 
@@ -255,7 +146,7 @@ void handleInputSync(char **tokens, LRUCache* cache, int* order)
 
     switch (tokens[0][1])
     {
-    case 'a':  // Adicionar
+    case 'a':  
     {
         (*order)++;
         Index *indice = createIndex(tokens + 1, *order);
@@ -269,7 +160,7 @@ void handleInputSync(char **tokens, LRUCache* cache, int* order)
         break;
     }
 
-    case 'd':  // Remover
+    case 'd':
     {
         int pidCliente = atoi(tokens[2]);
         int pidBusca = atoi(tokens[1]);
@@ -281,7 +172,6 @@ void handleInputSync(char **tokens, LRUCache* cache, int* order)
             respondErrorMessage(diretoria);
             break;
         }
-
         respondMessageRemove(diretoria, pidBusca);
         break;
     }
@@ -291,18 +181,20 @@ void handleInputSync(char **tokens, LRUCache* cache, int* order)
     }
 }
 
-Index* handleInputAsync(char **tokens, LRUCache* cache)
+
+
+
+
+Index* handleInputAsync(char* datasetDirectory, char **tokens, LRUCache* cache)
 {
     char diretoria[256] = "";
-
     switch (tokens[0][1])
     {
-        case 'c':  // Consultar
+        case 'c':  
         {
             int pidCliente = atoi(tokens[2]);
             int pidBusca = atoi(tokens[1]);
             sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
-        
             Index* indice = lruCacheGet(cache, pidBusca);
         
             if (indice == NULL) {
@@ -314,170 +206,110 @@ Index* handleInputAsync(char **tokens, LRUCache* cache)
                 respondMessageConsulta(diretoria, indice);
                 return indice;  
             }
-        
             respondMessageConsulta(diretoria, indice);
-            return NULL;
+            return indice;
         }
         
-
         case 'l': 
         {
             int pidBusca = atoi(tokens[1]);
             int pidCliente = atoi(tokens[3]);
             sprintf(diretoria, "tmp/writeServerFIFO%d", pidCliente);
             mkfifo(diretoria, 0666);
-            char absoluteDirectory[256];
-        
             Index* indice = lruCacheGet(cache, pidBusca);
-        
+            
             if (indice == NULL) {
                 indice = searchDisco(pidBusca);
                 if (indice == NULL) {
                     respondErrorMessage(diretoria);
                     return NULL;
                 }
-        
-                sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
-
-                if (fork() == 0) {
-                    int fdmessage = open(diretoria, O_WRONLY);
-                    dup2(fdmessage, 1);
-                    close(fdmessage);
-                    execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
-                    exit(1);
-                }
-        
+                spawnGrepCount(datasetDirectory, diretoria, tokens[2], indice);
                 return indice;
             }
+            spawnGrepCount(datasetDirectory, diretoria, tokens[2], indice);
+            return indice;
+        }
         
-            sprintf(absoluteDirectory, "Gdataset/%s", indice->path);
-        
-            if (fork() == 0) {
-                int fdmessage = open(diretoria, O_WRONLY);
-                dup2(fdmessage, 1);
-                close(fdmessage);
-                execl("/usr/bin/grep", "grep", "-c", "-w", tokens[2], absoluteDirectory, NULL);
-                exit(1);
+
+        case 's':  
+        {
+            GArray *ret = g_array_new(FALSE, FALSE, sizeof(int));
+            GArray* indexArray = getIndexsFromCacheAndDisc(cache);
+            if (tokens[2][0] == 'n') {
+                sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
+                findIndexsMatchParallel(datasetDirectory, ret, tokens[1], indexArray, atoi(tokens[2] + 1));
+            } else {
+                sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
+                findIndexsMatch(datasetDirectory, ret, tokens[1], indexArray);
             }
-        
+            writeGArrayToFIFO(ret, diretoria);
+            g_array_free(ret, TRUE);
+            freeEstrutura(indexArray);
             return NULL;
         }
-
-    case 's':  
-    {
-        GArray *ret = g_array_new(FALSE, FALSE, sizeof(int));
-        GArray* indexArray = getIndexsFromCacheAndDisc(cache);
-
-        if (tokens[2][0] == 'n') {
-            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[3]));
-            findIndexsMatchParallel(ret, tokens[1], indexArray, atoi(tokens[2] + 1));
-        } else {
-            sprintf(diretoria, "tmp/writeServerFIFO%d", atoi(tokens[2]));
-            findIndexsMatch(ret, tokens[1], indexArray);
-        }
-
-        writeGArrayToFIFO(ret, diretoria);
-        g_array_free(ret, TRUE);
-        freeEstrutura(indexArray);
-        return NULL;
-    }
-
-    default:
-        break;
+        default:
+            break;
     }
     return NULL;
 }
 
 
+void initializeServer(int argc, char *argv[], int *cacheSize, LRUCache **cacheLRU, int *ordem, int *fdOrdem) {
+    printf("Server pid: %d\n", getpid());
+    (void)argc;
+    *cacheSize = atoi(argv[2]);
+    *cacheLRU = lruCacheNew(*cacheSize);
+    cachePopulateDisco(*cacheSize, *cacheLRU);
+
+    *fdOrdem = open("ordem", O_RDONLY | O_CREAT, 0666);
+    read(*fdOrdem, ordem, sizeof(int));
+    close(*fdOrdem);
+}
+
 
 
 
 int main(int argc, char *argv[]) {
-    (void)argc;
-    int cacheSize = atoi(argv[2]);
-    LRUCache* cacheLRU = lruCacheNew(cacheSize);
-    int fd;
+    int cacheSize;
     int ordem = 0;
-    int fdOrdem = open("ordem",O_RDONLY | O_CREAT,0666);
-    read(fdOrdem,&ordem,sizeof(int));
-    close(fdOrdem);
     int status;
     int fdRDdummyCache;
     int fdRDdummyZombies;
-
-    mkfifo(ZOMBIESFIFOPATH,0666);
-    mkfifo(CACHECONNECTPATH,0666);
-
-    pid_t pid;
-    if ((pid = fork()) == 0) {    
-        int fdWriteZ = open(CACHECONNECTPATH,O_WRONLY);
-        close(fdWriteZ);
-        int fdWriteC = open(ZOMBIESFIFOPATH,O_WRONLY);
-        close(fdWriteC);
-        
-        exit(0);
-    } else {
-        fdRDdummyCache = open(CACHECONNECTPATH,O_RDONLY);
-        fdRDdummyZombies = open(ZOMBIESFIFOPATH,O_RDONLY);
-    }
+    int fdOrdem;
+    LRUCache* cacheLRU;
+    int fd;
+    
+    initializeServer(argc, argv, &cacheSize, &cacheLRU, &ordem, &fdOrdem);
+    setupFIFOsAndDescriptors(&fdRDdummyCache, &fdRDdummyZombies);
 
     while (1) {
         fd = open("tmp/writeClientFIFO", O_RDONLY);
         
         if (fd == -1) {
-            close(fd);
             continue;
         }
 
         char clientInput[1024] = "";
-        char zombiepid[256] = "";
-        Index* cacheConnect = malloc(sizeof(Index));
-
         read(fd, clientInput, 1024);
-        printf("O cliente mandou isto:%s\n", clientInput);
+        printf("O cliente mandou isto: %s\n", clientInput);
         
-        int nbytesZombies = read(fdRDdummyZombies,zombiepid,256);
-        int nbytesCache = read(fdRDdummyCache,cacheConnect,sizeof(Index));
-        
-        if (nbytesZombies > 0) {
-            Parser *parseZombies = newParser(64);
-            parseZombies = parser(parseZombies, zombiepid,' ');
-            char **tokens = getTokens(parseZombies);
-            int size = getNumTokens(parseZombies);
-
-            for (int i = 0; i <size ; i++){     
-                int morto = waitpid(atoi(tokens[i]), &status, 0);                  
-                printf("Processo zombie morto:%d\n",morto);
-            }
-            freeParser(parseZombies);
-            
-        }
-
-        if(nbytesCache > 0){
-            lruCachePut(cacheLRU,cacheConnect->order,cacheConnect);
-        }
-
-        
+        handleFIFOUpdates(fdRDdummyZombies, fdRDdummyCache, cacheLRU, &status);
 
         int isAsync = checkAsync(clientInput);
         if (isAsync) {
             pid_t pid;
+            close(fd);
             if ((pid = fork()) == 0) {    
                 Parser *parseFIFO = newParser(10);
-                parseFIFO = parser(parseFIFO, clientInput,' ');
+                parseFIFO = parser(parseFIFO, clientInput, ' ');
                 char **tokens = getTokens(parseFIFO);
-                Index* updateCache = handleInputAsync(tokens, cacheLRU);
-                //sleep(5);
-                char pidstr[16];
-                sprintf(pidstr, "%d ", getpid());
-                int fdWRZ = open(ZOMBIESFIFOPATH,O_WRONLY);
-                write(fdWRZ,pidstr,strlen(pidstr));
-                close(fdWRZ);
-                if(updateCache != NULL){
-                    int fdWRC = open(CACHECONNECTPATH,O_WRONLY);
-                    write(fdWRC,updateCache,sizeof(Index));
-                    close(fdWRC);
-                    free(updateCache);
+                Index* updateCache = handleInputAsync(argv[1], tokens, cacheLRU);
+
+                writeZombiePID();
+
+                if (updateCache != NULL) {
+                    writeCacheUpdate(updateCache);
                 }
                 freeParser(parseFIFO);
                 exit(0);
@@ -486,27 +318,23 @@ int main(int argc, char *argv[]) {
             }
         }
 
-
-
         Parser *parseFIFO = newParser(10);
-        parseFIFO = parser(parseFIFO, clientInput,'|');
+        parseFIFO = parser(parseFIFO, clientInput, '|');
         char **tokens = getTokens(parseFIFO);
 
         if (tokens[0][1] == 'f') {
             freeParser(parseFIFO);
-            int fdOrdem = open("ordem",O_WRONLY | O_CREAT,0666);
-            write(fdOrdem,&ordem,sizeof(int));
-            close(fdOrdem);
-            close(fd);
-            close(fdRDdummyCache);
-            close(fdRDdummyZombies);
-            lruCachePrint(cacheLRU);
+            fdOrdem = open("ordem", O_WRONLY | O_CREAT, 0666);
+            write(fdOrdem, &ordem, sizeof(int));
+            cleanExit(fdOrdem, fd, fdRDdummyCache, fdRDdummyZombies, cacheLRU);
             break;
         }
-        handleInputSync(tokens, cacheLRU,&ordem);
+
+        handleInputSync(tokens, cacheLRU, &ordem);
         freeParser(parseFIFO);
         close(fd);
     }
+
     close(fdRDdummyCache);
     close(fdRDdummyZombies);
     lruCacheFree(cacheLRU);

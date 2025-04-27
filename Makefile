@@ -37,3 +37,6 @@ obj/%.o: src/%.c
 
 clean:
 	rm -rf obj/* tmp/* bin/dclient bin/dserver indexs ordem
+
+recompile:
+	rm -rf obj/* bin/dclient bin/dserver

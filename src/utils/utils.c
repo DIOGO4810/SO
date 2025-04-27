@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <glib.h>
-
+#include "dserver.h"
 
 char *removeAspas(char *str)
 {
@@ -88,6 +88,10 @@ void printGArray(GArray *array)
     printf("]\n");
 
 }
+
+
+
+
 
 int isDigitsOnly(char* str) {
     for (int i = 0; str[i]; i++) {

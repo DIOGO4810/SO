@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "dserver.h"
+#include "lruCache.h"
 
 void writeDisco(Index* indice) {
     int fd = open("indexs", O_WRONLY | O_APPEND | O_CREAT, 0666);
@@ -91,4 +92,50 @@ int removeDisco(int ordem) {
     close(fdR);
 
     return 0;
+}
+
+
+
+void cachePopulateDisco(int cacheSize,LRUCache* cache){
+
+    int fdR = open("indexs",O_RDONLY);
+    int bytesRead;
+    for (int i = 0; i < cacheSize; i++)
+    {
+        Index* indice = malloc(getStructSize());
+        bytesRead = read(fdR, indice, getStructSize());
+        if (bytesRead < getStructSize()) break; 
+        printIndice(indice);
+        lruCachePut(cache,getOrder(indice),indice);
+    }
+    
+    close(fdR);
+
+
+}
+
+
+GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
+    GArray* indexArray = lruCacheFill(cache);
+
+    int fd = open("indexs", O_RDONLY | O_CREAT,0666);
+    if (fd == -1) {
+        perror("Erro ao abrir indexs");
+        close(fd);
+        return indexArray;
+    }
+    Index* indice = malloc(getStructSize());
+    ssize_t bytesRead;
+    while ((bytesRead = read(fd, indice,getStructSize())) == getStructSize()) {
+        if (getPidCliente(indice) == -1) continue;
+        if (!lruCacheContains(cache,indice)) {
+            Index* copia = malloc(getStructSize());
+            memcpy(copia, indice, getStructSize());
+            g_array_append_val(indexArray, copia);
+        }
+    }
+    free(indice);
+    close(fd);
+    
+    return indexArray;
 }
