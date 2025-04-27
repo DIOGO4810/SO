@@ -96,23 +96,39 @@ int removeDisco(int ordem) {
 
 
 
-void cachePopulateDisco(int cacheSize,LRUCache* cache){
-
-    int fdR = open("indexs",O_RDONLY);
+void cachePopulateDisco(int cacheSize, LRUCache* cache) {
+    int fdR = open("indexs", O_RDONLY);
     int bytesRead;
-    for (int i = 0; i < cacheSize; i++)
-    {
+
+    for (int i = 0; i < cacheSize;) {  
         Index* indice = malloc(getStructSize());
+        if (indice == NULL) {
+            perror("Erro ao alocar memória");
+            close(fdR);
+            return;
+        }
+
         bytesRead = read(fdR, indice, getStructSize());
-        if (bytesRead < getStructSize()) break; 
+        if (bytesRead < getStructSize()) {
+            free(indice);  
+            break;  
+        }
+        
+        //Indice eliminado
+        if (getPidCliente(indice) == -1) {
+            free(indice);  
+            continue; 
+        }
+
         printIndice(indice);
-        lruCachePut(cache,getOrder(indice),indice);
+        lruCachePut(cache, getOrder(indice), indice);
+        i++;  
     }
-    
+
     close(fdR);
-
-
 }
+
+
 
 
 GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
