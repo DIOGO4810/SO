@@ -1,10 +1,13 @@
 CC = gcc
 CFLAGS := -Wall -Wno-unused-result -g -Og -O2 -Wextra -pedantic -Iinclude $(shell pkg-config --cflags glib-2.0) 
-LDFLAGS := $(shell pkg-config --libs glib-2.0) -L/usr/lib/x86_64-linux-gnu -lm
+LDFLAGS := $(shell pkg-config --libs glib-2.0) -L/usr/lib/x86_64-linux-gnu -lm 
 
 SRC_UTILS := $(shell find src/utils/ -name "*.c")
+SRC_SERVER_UTILS := $(shell find src/serverUtils/ -name "*.c")
 
-SRC_DSERVER := src/dserver.c $(SRC_UTILS)
+
+
+SRC_DSERVER := src/dserver.c $(SRC_UTILS) $(SRC_SERVER_UTILS)
 SRC_DCLIENT := src/dclient.c $(SRC_UTILS)
 
 OBJ_DSERVER := $(SRC_DSERVER:src/%.c=obj/%.o)
@@ -33,4 +36,7 @@ obj/%.o: src/%.c
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf obj/* tmp/* bin/*
+	rm -rf obj/* tmp/* bin/dclient bin/dserver indexs ordem
+
+recompile:
+	rm -rf obj/* bin/dclient bin/dserver

@@ -4,9 +4,10 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <glib.h>
-
+#include "dserver.h"
 
 char *removeAspas(char *str)
 {
@@ -55,10 +56,10 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
         return;
     }
 
-    char buffer[1024] = "[";
-    char temp[32];
-
+    char buffer[16384] = "[";
     for (guint i = 0; i < array->len; i++) {
+        if(g_array_index(array, int, i) == 0 && array->len == 1)break;
+        char temp[32] = "";
         snprintf(temp, sizeof(temp), "%d", g_array_index(array, int, i));
         strcat(buffer, temp);
         if (i < array->len - 1) strcat(buffer, ",");
@@ -69,6 +70,10 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
     
     close(fd);
 }
+
+
+
+
 
 
 void printGArray(GArray *array)
@@ -83,3 +88,51 @@ void printGArray(GArray *array)
     printf("]\n");
 
 }
+
+
+
+
+
+int isDigitsOnly(char* str) {
+    for (int i = 0; str[i]; i++) {
+        if (!isdigit(str[i])) return 0;
+    }
+    return 1;
+}
+
+
+int validaInput(char** argv) {
+    int titleSize = strlen(argv[2]);
+    int authorsSize = strlen(argv[3]); 
+    int yearSize = strlen(argv[4]);
+    int pathSize = strlen(argv[5]);
+
+    if (titleSize > 250) {
+        printf("Erro: O título é demasiado longo (máximo 200 caracteres).\n");
+        return 0;
+    }
+    if (authorsSize > 100) {
+        printf("Erro: Os autores têm demasiados caracteres (máximo 200 caracteres).\n");
+        return 0;
+    }
+    if (yearSize > 4) {
+        printf("Erro: O ano deve ter no máximo 4 dígitos.\n");
+        return 0;
+    }
+    if (pathSize > 100) {
+        printf("Erro: O caminho é demasiado longo (máximo 64 caracteres).\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+
+
+
+
+
+
+
+
+

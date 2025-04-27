@@ -5,4 +5,7 @@
 char *concatInput(int argc, char **input, const char *format, ...);
 void writeGArrayToFIFO(GArray *array, const char *fifoPath);
 void printGArray(GArray *array);
+int validaInput(char** argv);
+
+
 #endif 
