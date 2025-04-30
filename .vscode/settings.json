@@ -8,7 +8,8 @@
         "dserver.h": "c",
         "stat.h": "c",
         "vector": "c",
-        "lrucache.h": "c"
+        "lrucache.h": "c",
+        "random": "c"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }
