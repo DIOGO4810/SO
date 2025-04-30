@@ -103,7 +103,6 @@ void lruCachePut(LRUCache* cache, int key, Index* indice) {
     Node* node = g_hash_table_lookup(cache->table, GINT_TO_POINTER(key));
 
     if (node) {
-        node->indice = indice;
         moveToHead(cache, node);
         return;
     }

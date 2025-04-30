@@ -12,8 +12,7 @@
 #include "serverUtils.h"
 #include "lruCache.h"
 
-#define ZOMBIESFIFOPATH "tmp/killzombies"
-#define CACHECONNECTPATH "tmp/cacheConnect"
+#define fifoDirectory "tmp/writeClientFIFO"
 
 struct index
 {
@@ -284,7 +283,7 @@ int main(int argc, char *argv[]) {
     setupFIFOsAndDescriptors(&fdRDdummyCache, &fdRDdummyZombies);
 
     while (1) {
-        fd = open("tmp/writeClientFIFO", O_RDONLY);
+        fd = open(fifoDirectory, O_RDONLY);
         
         if (fd == -1) {
             continue;

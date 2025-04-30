@@ -181,7 +181,7 @@ void respondMessageConsulta(char *diretoria, Index *indice)
     mkfifo(diretoria, 0666);
     int fdmessage = open(diretoria, O_WRONLY);
     char *message = malloc(512 * sizeof(char));
-
+    
     char *title = getTitle(indice);
     char *author = getAuthor(indice);
     char *path = getPath(indice);
