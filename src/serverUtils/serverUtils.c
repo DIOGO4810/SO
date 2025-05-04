@@ -289,30 +289,45 @@ void writeCacheUpdate(Index* updateCache) {
 
 void handleFIFOUpdates(int fdRDdummyZombies, int fdRDdummyCache, LRUCache *cacheLRU, int *status) {
     char zombiepid[256] = "";
-    Index *cacheConnect = malloc(getStructSize());
+
     
+    // Leitura do pipe de zombies
     int nbytesZombies = read(fdRDdummyZombies, zombiepid, 256);
-    int nbytesCache = read(fdRDdummyCache, cacheConnect, getStructSize());
-    
     if (nbytesZombies > 0) {
         Parser *parseZombies = newParser(64);
         parseZombies = parser(parseZombies, zombiepid, ' ');
         char **tokens = getTokens(parseZombies);
         int size = getNumTokens(parseZombies);
-
+        
         for (int i = 0; i < size; i++) {     
             int morto = waitpid(atoi(tokens[i]), status, 0);                  
             printf("Processo zombie morto: %d\n", morto);
         }
         freeParser(parseZombies);
     }
-
+    
+    Index *cacheConnect = malloc(getStructSize());
+    int nbytesCache = read(fdRDdummyCache, cacheConnect, getStructSize());
     if (nbytesCache > 0) {
         lruCachePut(cacheLRU, getOrder(cacheConnect), cacheConnect);
-    }
 
-    
+        // Loop para ler os restantes dados
+        while (1) {
+            Index *novaEntrada = malloc(getStructSize());
+            nbytesCache = read(fdRDdummyCache, novaEntrada, getStructSize());
+
+            if (nbytesCache > 0) {
+                lruCachePut(cacheLRU, getOrder(novaEntrada), novaEntrada);
+            } else {
+                free(novaEntrada);
+                break;
+            }
+        }
+    } else {
+        free(cacheConnect);  
+    }
 }
+
 
 
 

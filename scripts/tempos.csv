@@ -1,9 +1,9 @@
 comando,real,user,sys
-bin/dclient -s "PG",    2.21,0.20,2.01
-bin/dclient -s "PG" 10,    0.76,0.07,0.69
-bin/dclient -s "PG" 20,    0.71,0.06,0.64
-bin/dclient -s "PG" 30,    0.71,0.08,0.61
-bin/dclient -s "PG" 40,    0.47,0.04,0.40
-bin/dclient -s "PG" 50,    0.60,0.06,0.51
-bin/dclient -s "PG" 60,    0.67,0.07,0.58
-bin/dclient -s "PG" 70,    0.51,0.03,0.41
+bin/dclient -s "PG",    10.31,1.00,9.30
+bin/dclient -s "PG" 80,    1.19,0.10,0.88
+bin/dclient -s "PG" 160,    1.10,0.06,0.66
+bin/dclient -s "PG" 240,    1.05,0.05,0.71
+bin/dclient -s "PG" 320,    1.16,0.06,0.62
+bin/dclient -s "PG" 400,    1.07,0.08,0.85
+bin/dclient -s "PG" 480,    1.08,0.13,0.67
+bin/dclient -s "PG" 560,    0.99,0.07,0.63
