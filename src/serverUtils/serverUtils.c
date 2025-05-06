@@ -7,12 +7,14 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "dserver.h"
+#include "index.h"
 #include "parser.h"
 #include "lruCache.h"
 
 #define ZOMBIESFIFOPATH "tmp/killzombies"
 #define CACHECONNECTPATH "tmp/cacheConnect"
+#define fifoDirectory "tmp/writeClientFIFO"
+
 
 void parseBufferToIntArray(char *buffer,GArray* ret) {
 
@@ -40,7 +42,7 @@ void findIndexsMatch(char* datasetDirectory,GArray* ret, char* match,GArray* ind
         char absoluteDirectory[256] = "";
         char* path = getPath(indice);
         sprintf(absoluteDirectory, "%s/%s",datasetDirectory,path );
-        free(path);
+        
         pid_t pid;
         if ((pid = fork()) == 0)
         {
@@ -98,7 +100,7 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
                 char absoluteDirectory[256];
                 char* path = getPath(indice);
                 snprintf(absoluteDirectory, sizeof(absoluteDirectory), "%s/%s",datasetDirectory, path);
-                free(path);
+                // free(path);
                 pid_t grepPid = fork();
                 if (grepPid == 0)
                 {
@@ -189,9 +191,9 @@ void respondMessageConsulta(char *diretoria, Index *indice)
     sprintf(message, "%s|%s|%d|%s", title, author, getYear(indice), path);
     (void)write(fdmessage, message, strlen(message));
 
-    free(title);
-    free(author);
-    free(path);
+    // free(title);
+    // free(author);
+    // free(path);
     free(message);
     close(fdmessage);
 }
@@ -223,9 +225,9 @@ void respondErrorMessage(char *diretoria)
     close(fdmessage);
 }
 
-int checkAsync(char *input)
+int checkAsync(char type)
 {
-    if (input[1] == 'a' || input[1] == 'd' || input[1] == 'f')
+    if (type == 'a' || type == 'd' || type == 'f')
         return 0;
     return 1 ;
 }
@@ -255,11 +257,10 @@ void setupFIFOsAndDescriptors(int *fdRDdummyCache, int *fdRDdummyZombies) {
 
 
 
-void cleanExit(int fdOrdem, int fd, int fdRDdummyCache, int fdRDdummyZombies, LRUCache *cacheLRU) {
+void cleanExit(int fdOrdem, int fd ,LRUCache *cacheLRU) {
     close(fdOrdem);
     close(fd);
-    close(fdRDdummyCache);
-    close(fdRDdummyZombies);
+
     lruCachePrint(cacheLRU);
 }
 
@@ -273,60 +274,42 @@ void writeZombiePID() {
     close(fdWRZ);
 }
 
-void writeCacheUpdate(Index* updateCache) {
-    int fdWRC = open(CACHECONNECTPATH, O_WRONLY);
+void writeSonUpdate(Index* sonUpdate) {
+    int fdWRC = open(fifoDirectory, O_WRONLY);
     if (fdWRC == -1) {
-        perror("Erro a abrir CACHECONNECTPATH para escrita");
+        perror("Erro a abrir fifo para escrita");
         return;
     }
 
-    write(fdWRC, updateCache, getStructSize());
+    write(fdWRC, sonUpdate, getStructSize());
     close(fdWRC);
-    free(updateCache);
+    if(getOrder(sonUpdate) == -1)free(sonUpdate);
 }
 
 
 
-void handleFIFOUpdates(int fdRDdummyZombies, int fdRDdummyCache, LRUCache *cacheLRU, int *status) {
-    char zombiepid[256] = "";
-
-    
-    // Leitura do pipe de zombies
-    int nbytesZombies = read(fdRDdummyZombies, zombiepid, 256);
-    if (nbytesZombies > 0) {
-        Parser *parseZombies = newParser(64);
-        parseZombies = parser(parseZombies, zombiepid, ' ');
-        char **tokens = getTokens(parseZombies);
-        int size = getNumTokens(parseZombies);
-        
-        for (int i = 0; i < size; i++) {     
-            int morto = waitpid(atoi(tokens[i]), status, 0);                  
-            printf("Processo zombie morto: %d\n", morto);
-        }
-        freeParser(parseZombies);
+int handleFIFOUpdates(LRUCache *cacheLRU, int *status, Index *receivedMessage) {
+    if (getPidZombie(receivedMessage)== -1) {
+        return 0;
     }
-    
-    Index *cacheConnect = malloc(getStructSize());
-    int nbytesCache = read(fdRDdummyCache, cacheConnect, getStructSize());
-    if (nbytesCache > 0) {
-        lruCachePut(cacheLRU, getOrder(cacheConnect), cacheConnect);
 
-        // Loop para ler os restantes dados
-        while (1) {
-            Index *novaEntrada = malloc(getStructSize());
-            nbytesCache = read(fdRDdummyCache, novaEntrada, getStructSize());
-
-            if (nbytesCache > 0) {
-                lruCachePut(cacheLRU, getOrder(novaEntrada), novaEntrada);
-            } else {
-                free(novaEntrada);
-                break;
-            }
-        }
-    } else {
-        free(cacheConnect);  
+    int pidZombie = getPidZombie(receivedMessage);
+    waitpid(pidZombie, status, 0);
+    printf("Processo zombie for eliminado: %d\n",pidZombie);
+    if (getOrder(receivedMessage) == -1) {
+        return 1;
     }
+
+    Index *novaEntrada = malloc(getStructSize());
+
+    // Copia os dados de receivedMessage para novaEntrada
+    memcpy(novaEntrada, receivedMessage, getStructSize());
+
+    // Coloca a nova entrada na cache LRU
+    lruCachePut(cacheLRU, getOrder(novaEntrada), novaEntrada);
+    return 1;
 }
+
 
 
 

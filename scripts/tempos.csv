@@ -1,9 +1,9 @@
 comando,real,user,sys
-bin/dclient -s "law",    3.41,0.34,3.06
-bin/dclient -s "law" 20,    0.31,0.04,0.26
-bin/dclient -s "law" 40,    0.27,0.05,0.21
-bin/dclient -s "law" 60,    0.29,0.04,0.17
-bin/dclient -s "law" 80,    0.28,0.01,0.16
-bin/dclient -s "law" 100,    0.27,0.01,0.13
-bin/dclient -s "law" 120,    0.28,0.00,0.06
-bin/dclient -s "law" 140,    0.29,0.02,0.20
+bin/dclient -s "the",    1.39,0.14,1.25
+bin/dclient -s "the" 10,    0.12,0.02,0.09
+bin/dclient -s "the" 20,    0.09,0.00,0.08
+bin/dclient -s "the" 30,    0.08,0.01,0.04
+bin/dclient -s "the" 40,    0.08,0.00,0.05
+bin/dclient -s "the" 50,    0.08,0.00,0.05
+bin/dclient -s "the" 60,    0.08,0.00,0.04
+bin/dclient -s "the" 70,    0.09,0.00,0.05

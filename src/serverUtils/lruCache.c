@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <glib.h>
-#include "dserver.h"
+#include "index.h"
 #include "lruCache.h"
 #include "utils.h"
 

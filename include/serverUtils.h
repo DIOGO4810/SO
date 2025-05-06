@@ -16,20 +16,20 @@ void respondMessageRemove(char *diretoria, int indice);
 
 void respondErrorMessage(char *diretoria);
 
-int checkAsync(char *input);
+int checkAsync(char type);
 
 
 
 
 void setupFIFOsAndDescriptors(int *fdRDdummyCache, int *fdRDdummyZombies);
 
-void cleanExit(int fdOrdem, int fd, int fdRDdummyCache, int fdRDdummyZombies, LRUCache *cacheLRU);
+void cleanExit(int fdOrdem, int fd, LRUCache *cacheLRU);
 
 void writeZombiePID();
 
-void writeCacheUpdate(Index* updateCache);
+void writeSonUpdate(Index* sonUpdate);
 
-void handleFIFOUpdates(int fdRDdummyZombies, int fdRDdummyCache, LRUCache *cacheLRU, int *status) ;
+int handleFIFOUpdates( LRUCache *cacheLRU, int *status,Index *receivedMessage) ;
 
 
 

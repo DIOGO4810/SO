@@ -10,4 +10,5 @@ for ((i = 1; i <= $1; i++))
 do
     random_number=$(shuf -i 0-"$numLinhas" -n 1)
     bin/dclient -c "$random_number"
+    echo $i
 done

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "utils.h"
 #include "parser.h"
+#include "index.h"
 #include <glib.h>
 
 #define fifoDirectory "tmp/writeClientFIFO"
@@ -86,56 +87,98 @@ void writeToFIFO(char *fifoPath, char *message) {
 }
 
 
-
 int main(int argc, char *argv[]) {
     mkfifo(fifoDirectory, 0666);  
 
     int fd = -1;
-    char *message = NULL;
+    Index* message = malloc(getStructSize());
+    if (!message) {
+        perror("Erro ao alocar memória para message");
+        return 1;
+    }
+
+    // Inicialização comum
+    setPidZombie(message, -1);
+    setOrder(message, -1);
+    setTitle(message, "");
+    setAuthor(message, "");
+    setPath(message, "");
+    setKeyWord(message, "");
+    setYear(message, 0);
+    setKey(message, -1);
+    setMessageType(message, '\0');
+    setPidCliente(message, getpid());     
+    setNumProcessos(message,-1);
 
     switch (argv[1][1]) {
-        case 'a':
-            if (!validaInput(argv)) return 0;
-            message = concatInput(argc, argv, "%s|%s|%s|%s|%s|%d", argv[1], argv[2], argv[3], argv[4], argv[5], getpid());
+        case 'a':  // adicionar
+            if (!validaInput(argv)) {
+                free(message);
+                return 0;
+            }
+            setTitle(message, argv[2]);
+            setAuthor(message, argv[3]);
+            setYear(message, atoi(argv[4]));
+            setPath(message, argv[5]);
+            setMessageType(message, 'a');
             break;
-        case 'c':
-            message = concatInput(argc, argv, "%s %d %d ", argv[1], atoi(argv[2]), getpid());
+
+        case 'c':  // consultar
+            setKey(message, atoi(argv[2]));
+            setMessageType(message, 'c');
             break;
-        case 'd':
-            message = concatInput(argc, argv, "%s|%d|%d", argv[1], atoi(argv[2]), getpid());
+
+        case 'd':  // deletar
+            setKey(message, atoi(argv[2]));
+            setMessageType(message, 'd');
             break;
-        case 'f':
-            writeToFIFO(fifoDirectory, argv[1]);
+
+        case 'f':  // finalizar
+            setMessageType(message, 'f');
+            setPidCliente(message, -1); 
             break;
-        case 'l':
-            message = concatInput(argc, argv, "%s %d %s %d ", argv[1], atoi(argv[2]), argv[3], getpid());
+
+        case 'l':  // localizar
+            setKey(message, atoi(argv[2]));
+            setKeyWord(message, argv[3]);
+            setMessageType(message, 'l');
             break;
-        case 's':
+
+        case 's':  // search
+            setMessageType(message, 's');
             if (argc == 4) {
-                message = concatInput(argc, argv, "%s %s n%s %d ", argv[1], argv[2], argv[3], getpid());
+                char keywordFull[30];
+                snprintf(keywordFull, sizeof(keywordFull), "n%s", argv[2]);
+                setKeyWord(message, keywordFull);
+                setNumProcessos(message,atoi(argv[3]));
             } else {
-                message = concatInput(argc, argv, "%s %s %d ", argv[1], argv[2], getpid());
+                setKeyWord(message, argv[2]);
             }
             break;
-        default:
-            break;
-    }
 
-    if (message != NULL) {
-        fd = open(fifoDirectory, O_WRONLY);
-        if (fd == -1) {
-            perror("Erro ao abrir FIFO para escrita");
+        default:
+            printf("Comando inválido.\n");
             free(message);
             return 0;
-        }
-        write(fd, message, strlen(message));
-        free(message);
-        close(fd);
     }
 
+    // Escreve a estrutura Index na FIFO
+    fd = open(fifoDirectory, O_WRONLY);
+    if (fd == -1) {
+        perror("Erro ao abrir FIFO para escrita");
+        free(message);
+        return 0;
+    }
+
+    write(fd, message,getStructSize());
+    close(fd);
+    free(message);
+
+    // Aguarda resposta do servidor, exceto no comando -f
     if (argv[1][1] != 'f') {
-        getServerMessage(argv);  
+        getServerMessage(argv);
     }
 
     return 0;
 }
+
