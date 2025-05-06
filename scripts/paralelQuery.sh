@@ -9,22 +9,22 @@ measure_time() {
     comando=$1
     descricao=$2
 
-    output=$($comando)
+    # Executa o comando e mede o tempo, capturando stdout e tempos
+    tempo_output=$( { /usr/bin/time -f "%e,%U,%S" bash -c "$comando"; } 2>&1 )
+    
+    # Separa tempo da saída
+    tempo=$(echo "$tempo_output" | tail -n 1)
+    output=$(echo "$tempo_output" | head -n -1)
 
-    # Imprime a saída do comando no terminal
+    # Mostra o output do comando
     echo "Resultado do comando: $comando"
     echo "$output"
     echo "|||||||||||||||||||||||||||||||||||||||"
     echo
 
-    # Captura os tempos sem redirecionar a saída normal do comando
-    tempo=$(/usr/bin/time -f "%e,%U,%S" $comando 2>&1>/dev/null)
-
-    
-    # Grava os tempos no CSV
+    # Grava no CSV
     echo "$descricao,    $tempo" >> "$outputFile"
 }
-
 # Not Paralel
 measure_time "bin/dclient -s $1" "bin/dclient -s \"$1\""
 #Paralel
