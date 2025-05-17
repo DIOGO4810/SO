@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <glib.h>
-#include "dserver.h"
+#include "index.h"
 
 char *removeAspas(char *str)
 {

@@ -1,6 +1,6 @@
 #ifndef PERSISTENCIA_H
 #define PERSISTENCIA_H
-#include "dserver.h"
+#include "index.h"
 #include "lruCache.h"
 #include <glib.h>
 

@@ -1,6 +1,6 @@
 #ifndef LRUCACHE_H
 #define LRUCACHE_H
-#include "dserver.h"
+#include "index.h"
 #include <glib.h>
 
 typedef struct lrucache LRUCache;

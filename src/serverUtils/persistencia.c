@@ -3,7 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-#include "dserver.h"
+#include "index.h"
 #include "lruCache.h"
 
 void writeDisco(Index* indice) {
@@ -38,7 +38,7 @@ Index* searchDisco(int ordem) {
 
     lseek(fd,(ordem-1)*getStructSize(),SEEK_SET);
     int bytesRead = read(fd,indice,getStructSize());
-    if(bytesRead == 0 || getPidCliente(indice) == -1){
+    if(bytesRead == 0 || getOrder(indice) == -1){
         free(indice); 
         close(fd);
         return NULL;
@@ -97,7 +97,7 @@ int removeDisco(int ordem) {
 
 
 void cachePopulateDisco(int cacheSize, LRUCache* cache) {
-    int fdR = open("indexs", O_RDONLY);
+    int fdR = open("indexs", O_RDONLY| O_CREAT,0666 );
     int bytesRead;
 
     for (int i = 0; i < cacheSize;) {  
@@ -115,7 +115,7 @@ void cachePopulateDisco(int cacheSize, LRUCache* cache) {
         }
         
         //Indice eliminado
-        if (getPidCliente(indice) == -1) {
+        if (getOrder(indice) == -1) {
             free(indice);  
             continue; 
         }
