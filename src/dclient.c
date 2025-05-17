@@ -11,31 +11,60 @@
 
 #define fifoDirectory "tmp/writeClientFIFO"
 
+void safeWrite(int fd, const char *buffer, size_t length) {
+
+        ssize_t written = write(fd, buffer , length );
+        if (written == -1) {
+            perror("Erro na escrita");
+        }
+}
 
 void getServerMessage(char **argv) {
     pid_t mypid = getpid();
     char diretoria[256];
-    sprintf(diretoria, "tmp/writeServerFIFO%d", mypid);
+    snprintf(diretoria, sizeof(diretoria), "tmp/writeServerFIFO%d", mypid);
 
     while (1) {
         int fd = open(diretoria, O_RDONLY);
         if (fd == -1) {
             continue;
         }
+
         char smallBuffer[256] = "";
         char *bigBuffer = NULL;
+        ssize_t bytesRead;
 
         if (argv[1][1] == 's') {
-            bigBuffer = malloc(16384);  
-            (void)read(fd, bigBuffer, 16384);
+            bigBuffer = malloc(16384);
+            if (!bigBuffer) {
+                perror("Erro ao alocar memória para bigBuffer");
+                close(fd);
+                break;
+            }
+            bytesRead = read(fd, bigBuffer, 16384 - 1);
+            if (bytesRead == -1) {
+                perror("Erro na leitura do FIFO (bigBuffer)");
+                free(bigBuffer);
+                close(fd);
+                break;
+            }
+            bigBuffer[bytesRead] = '\0';
         } else {
-            (void)read(fd, smallBuffer, sizeof(smallBuffer)); 
+            bytesRead = read(fd, smallBuffer, sizeof(smallBuffer) - 1);
+            if (bytesRead == -1) {
+                perror("Erro na leitura do FIFO (smallBuffer)");
+                close(fd);
+                break;
+            }
+            smallBuffer[bytesRead] = '\0';
         }
 
         if (atoi(smallBuffer) == 404) {
-            write(1, "Index não existente\n", 21);
+            safeWrite(STDOUT_FILENO, "Index não existente\n", 21);
             close(fd);
-            unlink(diretoria);
+            if (unlink(diretoria) == -1) {
+                perror("Erro a apagar FIFO");
+            }
             break;
         }
 
@@ -44,37 +73,42 @@ void getServerMessage(char **argv) {
             case 'a':
             case 'd':
             case 'l':
-                write(1, smallBuffer, strlen(smallBuffer));  
+                safeWrite(STDOUT_FILENO, smallBuffer, strlen(smallBuffer));
                 break;
 
             case 's':
-                write(1, bigBuffer, strlen(bigBuffer));  
+                safeWrite(STDOUT_FILENO, bigBuffer, strlen(bigBuffer));
                 break;
 
             case 'c': {
                 Parser *parseFIFO = newParser(10);
+                if (!parseFIFO) {
+                    fprintf(stderr, "Erro ao criar parser\n");
+                    break;
+                }
                 parseFIFO = parser(parseFIFO, smallBuffer, '|');
                 char **tokens = getTokens(parseFIFO);
                 char output[512];
-                snprintf(output, sizeof(output), "Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n", tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
-                write(1, output, strlen(output));
+                snprintf(output, sizeof(output), "Title: %s\nAuthors: %s\nYear: %d\nPath: %s\n",
+                         tokens[0], tokens[1], atoi(tokens[2]), tokens[3]);
+                safeWrite(STDOUT_FILENO, output, strlen(output));
                 freeParser(parseFIFO);
                 break;
             }
 
             default:
-                write(1, "Comando inválido\n", 17);
+                safeWrite(STDOUT_FILENO, "Comando inválido\n", 17);
                 break;
         }
 
         close(fd);
-        unlink(diretoria);
-        if (bigBuffer != NULL)free(bigBuffer); 
+        if (unlink(diretoria) == -1) {
+            perror("Erro a apagar FIFO");
+        }
+        if (bigBuffer != NULL) free(bigBuffer);
         break;
     }
 }
-
-
 
 void writeToFIFO(char *fifoPath, char *message) {
     int fd = open(fifoPath, O_WRONLY);
@@ -82,13 +116,14 @@ void writeToFIFO(char *fifoPath, char *message) {
         perror("Erro ao abrir FIFO para escrita");
         return;
     }
-    write(fd, message, strlen(message));
+    safeWrite(fd, message, strlen(message));
     close(fd);
 }
 
-
 int main(int argc, char *argv[]) {
-    mkfifo(fifoDirectory, 0666);  
+   mkfifo(fifoDirectory, 0666);
+
+    
 
     int fd = -1;
     Index* message = malloc(getStructSize());
@@ -107,8 +142,14 @@ int main(int argc, char *argv[]) {
     setYear(message, 0);
     setKey(message, -1);
     setMessageType(message, '\0');
-    setPidCliente(message, getpid());     
-    setNumProcessos(message,-1);
+    setPidCliente(message, getpid());
+    setNumProcessos(message, -1);
+
+    if (argc < 2) {
+        fprintf(stderr, "Uso: %s -[a|c|d|f|l|s] [args]\n", argv[0]);
+        free(message);
+        return 1;
+    }
 
     switch (argv[1][1]) {
         case 'a':  // adicionar
@@ -135,7 +176,7 @@ int main(int argc, char *argv[]) {
 
         case 'f':  // finalizar
             setMessageType(message, 'f');
-            setPidCliente(message, -1); 
+            setPidCliente(message, -1);
             break;
 
         case 'l':  // localizar
@@ -150,35 +191,38 @@ int main(int argc, char *argv[]) {
                 char keywordFull[30];
                 snprintf(keywordFull, sizeof(keywordFull), "n%s", argv[2]);
                 setKeyWord(message, keywordFull);
-                setNumProcessos(message,atoi(argv[3]));
+                setNumProcessos(message, atoi(argv[3]));
             } else {
                 setKeyWord(message, argv[2]);
             }
             break;
 
         default:
-            printf("Comando inválido.\n");
+            fprintf(stderr, "Comando inválido.\n");
             free(message);
-            return 0;
+            return 1;
     }
 
-    // Escreve a estrutura Index na FIFO
     fd = open(fifoDirectory, O_WRONLY);
     if (fd == -1) {
         perror("Erro ao abrir FIFO para escrita");
         free(message);
-        return 0;
+        return 1;
     }
 
-    write(fd, message,getStructSize());
+    if (write(fd, message, getStructSize()) == -1) {
+        perror("Erro na escrita para FIFO");
+        close(fd);
+        free(message);
+        return 1;
+    }
+
     close(fd);
     free(message);
 
-    // Aguarda resposta do servidor, exceto no comando -f
     if (argv[1][1] != 'f') {
         getServerMessage(argv);
     }
 
     return 0;
 }
-
