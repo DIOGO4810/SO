@@ -48,17 +48,20 @@ char *concatInput(int argc, char **input, const char *format, ...)
 
 
 void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
-    mkfifo(fifoPath, 0666);
+    if (mkfifo(fifoPath, 0666) == -1 ) {
+        perror("Erro ao criar FIFO");
+        return;
+    }
 
     int fd = open(fifoPath, O_WRONLY);
     if (fd == -1) {
-        perror("Erro ao abrir FIFO");
+        perror("Erro ao abrir FIFO para escrita");
         return;
     }
 
     char buffer[16384] = "[";
     for (guint i = 0; i < array->len; i++) {
-        if(g_array_index(array, int, i) == 0 && array->len == 1)break;
+        if (g_array_index(array, int, i) == 0 && array->len == 1) break;
         char temp[32] = "";
         snprintf(temp, sizeof(temp), "%d", g_array_index(array, int, i));
         strcat(buffer, temp);
@@ -66,11 +69,15 @@ void writeGArrayToFIFO(GArray *array, const char *fifoPath) {
     }
     strcat(buffer, "]\n");
 
-    write(fd, buffer, strlen(buffer));
-    
-    close(fd);
-}
+    ssize_t bytesWritten = write(fd, buffer, strlen(buffer));
+    if (bytesWritten == -1) {
+        perror("Erro ao escrever para FIFO");
+    }
 
+    if (close(fd) == -1) {
+        perror("Erro ao fechar FIFO");
+    }
+}
 
 
 
@@ -108,24 +115,26 @@ int validaInput(char** argv) {
     int pathSize = strlen(argv[5]);
 
     if (titleSize > 250) {
-        printf("Erro: O título é demasiado longo (máximo 200 caracteres).\n");
+        write(STDOUT_FILENO, "Erro: O título é demasiado longo (máximo 200 caracteres).\n", 60);
         return 0;
     }
     if (authorsSize > 100) {
-        printf("Erro: Os autores têm demasiados caracteres (máximo 200 caracteres).\n");
+        write(STDOUT_FILENO, "Erro: Os autores têm demasiados caracteres (máximo 200 caracteres).\n", 69);
         return 0;
     }
     if (yearSize > 4) {
-        printf("Erro: O ano deve ter no máximo 4 dígitos.\n");
+        write(STDOUT_FILENO, "Erro: O ano deve ter no máximo 4 dígitos.\n", 43);
         return 0;
     }
     if (pathSize > 100) {
-        printf("Erro: O caminho é demasiado longo (máximo 64 caracteres).\n");
+        write(STDOUT_FILENO, "Erro: O caminho é demasiado longo (máximo 64 caracteres).\n", 60);
         return 0;
     }
 
     return 1;
 }
+
+
 
 
 

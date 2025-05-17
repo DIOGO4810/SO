@@ -34,4 +34,4 @@ measure_time "bin/dclient -s $1 $(( $2 * 3 ))" "bin/dclient -s \"$1\" $(( $2 * 3
 measure_time "bin/dclient -s $1 $(( $2 * 4 ))" "bin/dclient -s \"$1\" $(( $2 * 4 ))"
 measure_time "bin/dclient -s $1 $(( $2 * 5 ))" "bin/dclient -s \"$1\" $(( $2 * 5 ))"
 measure_time "bin/dclient -s $1 $(( $2 * 6 ))" "bin/dclient -s \"$1\" $(( $2 * 6 ))"
-measure_time "bin/dclient -s $1 $(( $2 * 7 ))" "bin/dclient -s \"$1\" $(( $2 * 7 ))"
+measure_time "bin/dclient -s $1 $(( $2 * 7 - 1 ))" "bin/dclient -s \"$1\" $(( $2 * 7 - 1 ))"

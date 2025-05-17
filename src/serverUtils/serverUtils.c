@@ -11,8 +11,6 @@
 #include "parser.h"
 #include "lruCache.h"
 
-#define ZOMBIESFIFOPATH "tmp/killzombies"
-#define CACHECONNECTPATH "tmp/cacheConnect"
 #define fifoDirectory "tmp/writeClientFIFO"
 
 
@@ -76,11 +74,8 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
         unlink(fifoPath);
     }
 
-    if (mkfifo(fifoPath, 0666) == -1)
-    {
-        perror("Erro ao criar FIFO");
-        return;
-    }
+    mkfifo(fifoPath, 0666);
+    
 
     int total = indexArray->len;
     int chunkSize = (total + numProcesses - 1) / numProcesses;
@@ -100,7 +95,6 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
                 char absoluteDirectory[256];
                 char* path = getPath(indice);
                 snprintf(absoluteDirectory, sizeof(absoluteDirectory), "%s/%s",datasetDirectory, path);
-                // free(path);
                 pid_t grepPid = fork();
                 if (grepPid == 0)
                 {
@@ -114,7 +108,10 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
                 {
                     char pidstr[64];
                     sprintf(pidstr,"%d ",getOrder(indice));
-                    write(fifoWrite, pidstr, strlen(pidstr));
+                    ssize_t written = write(fifoWrite, pidstr, strlen(pidstr));
+                    if (written == -1) {
+                        perror("Erro na escrita");
+                    }
                 }
 
             }
@@ -132,8 +129,20 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
         }
     }
 
-        int fifoRead = open(fifoPath, O_RDONLY);
+        int fifoRead = open(fifoPath, O_RDONLY);   
+        if (fifoRead == -1)
+        {
+            perror("Erro ao abrir FIFO para leitura");
+            unlink(fifoPath);
+            return;
+        }
         int fifoWrite = open(fifoPath, O_WRONLY);
+        if (fifoWrite == -1)
+        {
+            perror("Erro ao abrir FIFO para escrita");
+            unlink(fifoPath);
+            return;
+        }
         // Espera todos os filhos terminarem
         for (int p = 0; p < numProcesses; p++)
         {
@@ -145,16 +154,16 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
             }
         }
 
-        write(fifoWrite,"End ",4);
-        if (fifoRead == -1)
-        {
-            perror("Erro ao abrir FIFO para leitura");
-            unlink(fifoPath);
-            return;
+        ssize_t writtenEnd = write(fifoWrite,"End ",4);
+        if (writtenEnd == -1) {
+            perror("Erro na escrita");
         }
     
         char buffer[16384]; 
-        read(fifoRead, buffer, 16384);
+        ssize_t bytesRead = read(fifoRead, buffer, 16384);
+        if (bytesRead == -1) {
+            perror("Erro na leitura do FIFO (Buffer)");
+        }
         parseBufferToIntArray(buffer,ret);
 
     
@@ -165,65 +174,109 @@ void findIndexsMatchParallel(char* datasetDirectory,GArray *ret, char *match, GA
 
 
 
-void respondMessageAdiciona(char *diretoria, int indice)
-{
-    mkfifo(diretoria, 0666);
+void respondMessageAdiciona(char *diretoria, int indice) {
+    mkfifo(diretoria,0666);
+
     int fdmessage = open(diretoria, O_WRONLY);
+    if (fdmessage == -1) {
+        perror("Erro ao abrir FIFO para escrita");
+        return;
+    }
+
     char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Document %d indexed\n", indice);
-    (void)write(fdmessage, message, strlen(message));
+
+    snprintf(message, 256, "Document %d indexed\n", indice);
+
+    if (write(fdmessage, message, strlen(message)) == -1) {
+        perror("Erro ao escrever na FIFO");
+    }
+
     free(message);
-    close(fdmessage);
+
+    if (close(fdmessage) == -1) {
+        perror("Erro ao fechar FIFO");
+    }
 }
 
 
 
-void respondMessageConsulta(char *diretoria, Index *indice)
-{
-    mkfifo(diretoria, 0666);
+void respondMessageConsulta(char *diretoria, Index *indice) {
+    mkfifo(diretoria,0666);
+
     int fdmessage = open(diretoria, O_WRONLY);
+    if (fdmessage == -1) {
+        perror("Erro ao abrir FIFO para escrita");
+        return;
+    }
+
     char *message = malloc(512 * sizeof(char));
-    
+
     char *title = getTitle(indice);
     char *author = getAuthor(indice);
     char *path = getPath(indice);
 
-    sprintf(message, "%s|%s|%d|%s", title, author, getYear(indice), path);
-    (void)write(fdmessage, message, strlen(message));
+    snprintf(message, 512, "%s|%s|%d|%s", title, author, getYear(indice), path);
 
-    // free(title);
-    // free(author);
-    // free(path);
+    if (write(fdmessage, message, strlen(message)) == -1) {
+        perror("Erro ao escrever na FIFO");
+    }
+
     free(message);
-    close(fdmessage);
+
+    if (close(fdmessage) == -1) {
+        perror("Erro ao fechar FIFO");
+    }
 }
 
 
 
 
-void respondMessageRemove(char *diretoria, int indice)
-{
-    mkfifo(diretoria, 0666);
+
+void respondMessageRemove(char *diretoria, int indice) {
+    mkfifo(diretoria,0666);
+
     int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(256 * sizeof(char));
-    sprintf(message, "Index entry %d deleted\n", indice);
-    (void)write(fdmessage, message, strlen(message));
-    free(message);
-    close(fdmessage);
+    if (fdmessage == -1) {
+        perror("Erro ao abrir FIFO para escrita");
+        return;
+    }
 
+    char *message = malloc(256 * sizeof(char));
+
+    snprintf(message, 256, "Index entry %d deleted\n", indice);
+
+    if (write(fdmessage, message, strlen(message)) == -1) {
+        perror("Erro ao escrever na FIFO");
+    }
+
+    free(message);
+
+    if (close(fdmessage) == -1) {
+        perror("Erro ao fechar FIFO");
+    }
 }
 
-void respondErrorMessage(char *diretoria)
-{
-    mkfifo(diretoria, 0666);
+
+void respondErrorMessage(char *diretoria) {
+    mkfifo(diretoria,0666);
+
     int fdmessage = open(diretoria, O_WRONLY);
-    char *message = malloc(256 * sizeof(char));
-    sprintf(message, "404");
-    write(fdmessage, message, strlen(message));
+    if (fdmessage == -1) {
+        perror("Erro ao abrir FIFO para escrita");
+        return;
+    }
 
-    free(message);
-    close(fdmessage);
+    const char *message = "404";
+
+    if (write(fdmessage, message, strlen(message)) == -1) {
+        perror("Erro ao escrever na FIFO");
+    }
+
+    if (close(fdmessage) == -1) {
+        perror("Erro ao fechar FIFO");
+    }
 }
+
 
 int checkAsync(char type)
 {
@@ -236,27 +289,6 @@ int checkAsync(char type)
 
 
 
-
-
-void setupFIFOsAndDescriptors(int *fdRDdummyCache, int *fdRDdummyZombies) {
-    mkfifo(ZOMBIESFIFOPATH, 0666);
-    mkfifo(CACHECONNECTPATH, 0666);
-
-    pid_t pid;
-    if ((pid = fork()) == 0) {    
-        int fdWriteZ = open(CACHECONNECTPATH, O_WRONLY);
-        close(fdWriteZ);
-        int fdWriteC = open(ZOMBIESFIFOPATH, O_WRONLY);
-        close(fdWriteC);
-        exit(0);
-    } else {
-        *fdRDdummyCache = open(CACHECONNECTPATH, O_RDONLY);
-        *fdRDdummyZombies = open(ZOMBIESFIFOPATH, O_RDONLY);
-    }
-}
-
-
-
 void cleanExit(int fdOrdem, int fd ,LRUCache *cacheLRU) {
     close(fdOrdem);
     close(fd);
@@ -266,14 +298,6 @@ void cleanExit(int fdOrdem, int fd ,LRUCache *cacheLRU) {
 
 
 
-void writeZombiePID() {
-    char pidstr[16];
-    sprintf(pidstr, "%d ", getpid());
-    int fdWRZ = open(ZOMBIESFIFOPATH, O_WRONLY);
-    write(fdWRZ, pidstr, strlen(pidstr));
-    close(fdWRZ);
-}
-
 void writeSonUpdate(Index* sonUpdate) {
     int fdWRC = open(fifoDirectory, O_WRONLY);
     if (fdWRC == -1) {
@@ -281,7 +305,12 @@ void writeSonUpdate(Index* sonUpdate) {
         return;
     }
 
-    write(fdWRC, sonUpdate, getStructSize());
+    ssize_t writtenSonUpdate = write(fdWRC, sonUpdate, getStructSize());
+    if (writtenSonUpdate == -1) {
+        perror("Erro ao escrever na FIFO");
+        close(fdWRC);
+        return;
+    }
     close(fdWRC);
     if(getOrder(sonUpdate) == -1)free(sonUpdate);
 }
@@ -309,20 +338,6 @@ int handleFIFOUpdates(LRUCache *cacheLRU, int *status, Index *receivedMessage) {
     lruCachePut(cacheLRU, getOrder(novaEntrada), novaEntrada);
     return 1;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

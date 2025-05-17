@@ -13,32 +13,40 @@ void writeDisco(Index* indice) {
         return;
     }
 
-    lseek(fd, 0, SEEK_END);
+    if (lseek(fd, 0, SEEK_END) == -1) {
+        perror("Erro no lseek");
+        close(fd);
+        return;
+    }
 
-    write(fd,indice,getStructSize());
-    
+    ssize_t bytes = write(fd, indice, getStructSize());
+    if (bytes != getStructSize()) {
+        perror("Erro ao escrever no ficheiro");
+    }
+
     close(fd);
 }
+
 
 
 Index* searchDisco(int ordem) {
     int fd = open("indexs", O_RDONLY);
     if (fd == -1) {
         perror("Erro ao abrir ficheiro no search");
-        close(fd);
         return NULL;
     }
 
     Index* indice = malloc(getStructSize()); 
-    if (indice == NULL) {
-        perror("Erro ao alocar memória");
+
+    if (lseek(fd, (ordem - 1) * getStructSize(), SEEK_SET) == -1) {
+        perror("Erro no lseek");
+        free(indice);
         close(fd);
         return NULL;
     }
 
-    lseek(fd,(ordem-1)*getStructSize(),SEEK_SET);
-    int bytesRead = read(fd,indice,getStructSize());
-    if(bytesRead == 0 || getOrder(indice) == -1){
+    int bytesRead = read(fd, indice, getStructSize());
+    if (bytesRead != getStructSize() || getOrder(indice) == -1) {
         free(indice); 
         close(fd);
         return NULL;
@@ -51,18 +59,14 @@ Index* searchDisco(int ordem) {
 
 
 
+
+
 int removeDisco(int ordem) {
     int fdW = open("indexs", O_WRONLY);
     int fdR = open("indexs", O_RDONLY);
 
 
     Index* indice = malloc(getStructSize());
-    if (!indice) {
-        perror("Erro de alocação");
-        close(fdW);
-        close(fdR);
-        return 1;
-    }
 
     off_t offset = (ordem - 1) * getStructSize();
     lseek(fdR, offset, SEEK_SET);
@@ -84,7 +88,10 @@ int removeDisco(int ordem) {
     // Substituir por uma struct marcada como deletada
     Index* deleted = getDeletedIndex();
     lseek(fdW, offset, SEEK_SET);
-    write(fdW, deleted, getStructSize());
+    ssize_t writtenDeleted = write(fdW, deleted, getStructSize());
+    if(writtenDeleted < 0){
+        perror("Erro ao escrever no ficheiro o indice Eliminado");
+    }
 
     free(indice);
     free(deleted);
@@ -96,25 +103,23 @@ int removeDisco(int ordem) {
 
 
 
+
 void cachePopulateDisco(int cacheSize, LRUCache* cache) {
-    int fdR = open("indexs", O_RDONLY| O_CREAT,0666 );
-    int bytesRead;
+    int fdR = open("indexs", O_RDONLY | O_CREAT, 0666);
+    if (fdR == -1) {
+        perror("Erro ao abrir ficheiro para preencher cache");
+        return;
+    }
 
     for (int i = 0; i < cacheSize;) {  
         Index* indice = malloc(getStructSize());
-        if (indice == NULL) {
-            perror("Erro ao alocar memória");
-            close(fdR);
-            return;
-        }
 
-        bytesRead = read(fdR, indice, getStructSize());
-        if (bytesRead < getStructSize()) {
+        int bytesRead = read(fdR, indice, getStructSize());
+        if (bytesRead != getStructSize()) {
             free(indice);  
             break;  
         }
         
-        //Indice eliminado
         if (getOrder(indice) == -1) {
             free(indice);  
             continue; 
@@ -131,27 +136,31 @@ void cachePopulateDisco(int cacheSize, LRUCache* cache) {
 
 
 
+
 GArray* getIndexsFromCacheAndDisc(LRUCache* cache) {
     GArray* indexArray = lruCacheFill(cache);
 
-    int fd = open("indexs", O_RDONLY | O_CREAT,0666);
+    int fd = open("indexs", O_RDONLY | O_CREAT, 0666);
     if (fd == -1) {
         perror("Erro ao abrir indexs");
-        close(fd);
         return indexArray;
     }
+
     Index* indice = malloc(getStructSize());
     ssize_t bytesRead;
-    while ((bytesRead = read(fd, indice,getStructSize())) == getStructSize()) {
+
+    while ((bytesRead = read(fd, indice, getStructSize())) == getStructSize()) {
         if (getPidCliente(indice) == -1) continue;
-        if (!lruCacheContains(cache,indice)) {
+        if (!lruCacheContains(cache, indice)) {
             Index* copia = malloc(getStructSize());
             memcpy(copia, indice, getStructSize());
             g_array_append_val(indexArray, copia);
         }
     }
+
     free(indice);
     close(fd);
     
     return indexArray;
 }
+
