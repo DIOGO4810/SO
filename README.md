@@ -6,6 +6,10 @@
 - **Carolina Martins** — A107285  
 - **Filipa Gonçalves** — A107329  
 
+## 📊 Final Grade
+
+19.5 Valores
+
 ---
 
 ## 📌 Resumo
