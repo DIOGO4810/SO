@@ -14,7 +14,7 @@
 
 ## 📌 Resumo
 
-Este projeto tem como objetivo implementar um serviço para **indexação e pesquisa de documentos de texto** armazenados localmente utilizando apenas Sys calls. O sistema é composto por dois componentes principais:
+Este projeto tem como objetivo implementar um serviço para **indexação e pesquisa de documentos de texto** armazenados localmente utilizando apenas System calls. O sistema é composto por dois componentes principais:
 
 - **Servidor**: responsável por manter um registo com meta-informações dos documentos (como título, autor, ano e caminho).
 - **Cliente**: interage com o servidor para adicionar, remover, pesquisar documentos ou obter detalhes sobre documentos indexados. Apenas uma operação pode ser executada por vez.
